@@ -1,0 +1,462 @@
+{
+  "name": "Handler: /menu /r",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -688,
+        144
+      ],
+      "id": "011d7dcc-663c-434e-8934-9384e6c793f2",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Handle both message and callback_query\nconst body = $json.body;\nlet message = null;\nlet chatId = null;\nlet username = null;\nlet firstName = null;\nlet lastName = null;\nlet isPremium = false;\nlet languageCode = 'en';\n\n// Check if it's a callback_query (button press)\nif (body.callback_query) {\n  const callback = body.callback_query;\n  message = callback.message;\n  chatId = message.chat.id;\n  username = message.chat.username || null;\n  firstName = message.chat.first_name || '';\n  lastName = message.chat.last_name || '';\n  isPremium = callback.from?.is_premium || false;\n  languageCode = callback.from?.language_code || 'en';\n} \n// Check if it's a regular message\nelse if (body.message) {\n  message = body.message;\n  chatId = message.chat.id;\n  username = message.chat.username || null;\n  firstName = message.chat.first_name || '';\n  lastName = message.chat.last_name || '';\n  isPremium = message.from?.is_premium || false;\n  languageCode = message.from?.language_code || 'en';\n}\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    username: username,\n    first_name: firstName,\n    last_name: lastName,\n    is_premium: isPremium,\n    language_code: languageCode\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -496,
+        144
+      ],
+      "id": "75b3cab2-851c-4ecf-a820-8427d474c36d",
+      "name": "Parse /menu command"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.chat_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -272,
+        144
+      ],
+      "id": "2d713b7d-e35d-40c1-b793-aa73d401c607",
+      "name": "Check user in DB",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-banned",
+              "leftValue": "={{ $json.is_banned }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -48,
+        144
+      ],
+      "id": "338c93bd-b86e-4b71-86e1-104779938d69",
+      "name": "User banned?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-admin",
+              "leftValue": "={{ $json.admin_active }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        176,
+        160
+      ],
+      "id": "21b40b5c-0d96-45a1-b105-d647d5b06bfb",
+      "name": "Admin mode active?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Parse /menu command').item.json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=⛔️ You are banned from using this bot.\n\nContact support: @PocketSound_bot\n\n/support\n\n@PocketSound_bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -48,
+        -32
+      ],
+      "id": "4865aa42-069d-49e0-85c9-a88a8b6c4afd",
+      "name": "Send banned message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Parse /menu command').item.json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=❄️ Admin mode is active. You cannot use the bot.\n\n@PocketSound_bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        192,
+        -32
+      ],
+      "id": "7afa4179-ab57-4379-8a81-bf62d772fcd0",
+      "name": "Send admin mode message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=User clicked Menu Button\n\nUsername: @{{ $('Parse /menu command').item.json.username }}\nFirst Name: {{ $('Parse /menu command').item.json.first_name }}\nTGID: {{ $('Parse /menu command').item.json.chat_id }}\n\nUser sees menu buttons\n- Profile\n- Edit Music\n- My Playlist\n- Sound Search\n- Back"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $('Check user in DB').item.json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        656,
+        176
+      ],
+      "id": "00ea28e9-2dc9-458c-bd54-e681b8f42ff5",
+      "name": "Notify admin"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendPhoto",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Parse /menu command').item.json.chat_id }}"
+            },
+            {
+              "name": "photo",
+              "value": "https://silver-perfect-barracuda-186.mypinata.cloud/ipfs/bafkreidjuficdk5vzzdga5xua2rjj657ka276jft4m4ootwag7227bxtny"
+            },
+            {
+              "name": "caption",
+              "value": "=You can search music by typing the name of the song or artist name\n\nYou can also share your music files and add them to your playlist.\n\n@PocketSound_bot"
+            },
+            {
+              "name": "reply_markup",
+              "value": "{\"inline_keyboard\":[[{\"text\":\"Profile\",\"callback_data\":\"/profile\"},{\"text\":\"Edit Music\",\"callback_data\":\"/editmusic\"}],[{\"text\":\"My Playlist\",\"callback_data\":\"/myplaylist\"},{\"text\":\"Sound Search 🔎\",\"callback_data\":\"/soundsearch\"}],[{\"text\":\"🔙 Back\",\"callback_data\":\"/back\"}]]}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        416,
+        176
+      ],
+      "id": "fe324413-df1f-4b66-bc69-4e6480248387",
+      "name": "Send menu to user"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=⛔️ BANNED USER TRIED TO USE MENU Button ⛔️\n\nUser: @{{ $('Parse /menu command').item.json.username }}\nTG ID: {{ $('Parse /menu command').item.json.chat_id }}\nBan reason: {{ $json.ban_reason || 'N/A' }}\n\n❄️ Admin mode is ACTIVE for this user.\n\nTo unban: `/admin_false {{ $('Parse /menu command').item.json.chat_id }}`"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "41d1e687-ef84-4a1e-9343-4a49dba32091",
+      "name": "Notify admin about banned user",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -48,
+        -208
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔄 User pressed MENU Button (Admin mode ACTIVE)\n\nUser: @{{ $('Parse /menu command').item.json.username }}\nTG ID: {{ $('Parse /menu command').item.json.chat_id }}\nFirst name: {{ $('Parse /menu command').item.json.first_name }}\nPremium: {{ $('Parse /menu command').item.json.is_premium }}\n\n❄️ Admin dialog is active. User cannot use MENU Button."
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "049e7af5-1e99-4337-b75e-9be7fd9efd73",
+      "name": "Notify admin about Menu",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        192,
+        -208
+      ]
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        880,
+        176
+      ],
+      "id": "86480cce-c4d6-4139-9c5f-b4b25d351b64",
+      "name": "No Operation, do nothing"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Parse /menu command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse /menu command": {
+      "main": [
+        [
+          {
+            "node": "Check user in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check user in DB": {
+      "main": [
+        [
+          {
+            "node": "User banned?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User banned?": {
+      "main": [
+        [
+          {
+            "node": "Send banned message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Admin mode active?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Admin mode active?": {
+      "main": [
+        [
+          {
+            "node": "Send admin mode message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send menu to user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send menu to user": {
+      "main": [
+        [
+          {
+            "node": "Notify admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send banned message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about banned user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send admin mode message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about Menu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify admin": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "532eff61-4b2a-4824-ad1e-0d25fcf88396",
+  "meta": {
+    "instanceId": "148b2b278c24b3c49bc4399db7e7ce15ed94f5b1044d28401c56f6ab511f0347"
+  },
+  "id": "0fMyMtf29VtMf0zt",
+  "tags": []
+}

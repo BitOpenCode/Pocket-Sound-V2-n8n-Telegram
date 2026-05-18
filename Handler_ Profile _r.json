@@ -1,0 +1,501 @@
+{
+  "name": "Handler: Profile /r",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -880,
+        320
+      ],
+      "id": "67f6ee92-e877-4e91-94ac-d83e9c9ff01c",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body;\nconst callback = body.callback_query;\nconst message = callback.message;\nconst chatId = message.chat.id;\nconst messageId = message.message_id;\nconst from = callback.from;\nconst username = from.username || null;\nconst firstName = from.first_name || '';\nconst lastName = from.last_name || '';\nconst isPremium = from.is_premium || false;\nconst languageCode = from.language_code || 'en';\nconst callbackData = callback.data || '';\n\nreturn [{\n  json: {\n    tg_id: chatId,\n    message_id: messageId,\n    username: username,\n    first_name: firstName,\n    last_name: lastName,\n    is_premium: isPremium,\n    language_code: languageCode,\n    callback_data: callbackData\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -656,
+        320
+      ],
+      "id": "8d5a4529-e148-4331-9ee9-4ec28a749486",
+      "name": "Parse profile callback"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.tg_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -432,
+        320
+      ],
+      "id": "3ebde1fd-6ef6-49ac-93ed-b4873eda62d4",
+      "name": "Check user in DB",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "banned",
+              "leftValue": "={{ $json.is_banned }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -208,
+        320
+      ],
+      "id": "84ec0295-0267-41ce-a292-f21028912fc6",
+      "name": "User banned?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "admin",
+              "leftValue": "={{ $json.admin_active }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        336
+      ],
+      "id": "3671f9f4-a537-484d-ac37-52e587b7b82d",
+      "name": "Admin mode active?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "⛔️ You are banned from using this bot.\n\nContact support: @PocketSoundbot\n\n@PocketSoundbot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -208,
+        160
+      ],
+      "id": "e801fb84-b9b9-4600-a459-9dfc288e48d7",
+      "name": "Send banned message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "❄️ Admin mode is active. You cannot view profile.\n\n@PocketSoundbot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        160
+      ],
+      "id": "567928d5-3e0b-4e17-8dde-c8166d8e8e0f",
+      "name": "Send admin mode message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "⛔️ BANNED USER pressed /profile\n\nUser: @{{ $json.username }}\nTG ID: {{ $json.chat_id }}\n\nTo unban: /admin_false {{ $json.chat_id }}"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -208,
+        0
+      ],
+      "id": "1369b582-9c54-436a-bc8e-302bb33c2192",
+      "name": "Notify admin about banned user"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "🔄 User pressed /profile (Admin mode ACTIVE)\n\nUser: @{{ $json.username }}\nTG ID: {{ $json.chat_id }}\n\n❄️ Admin dialog is active. User cannot view profile."
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "51eca7c2-bfa6-4f34-97bf-08b7094708c0",
+      "name": "Notify admin about admin mode"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH user_data AS (\n  SELECT \n    u.id,\n    u.tg_id,\n    u.tg_username,\n    u.tg_first_name,\n    u.tg_last_name,\n    u.premium,\n    u.language_code,\n    u.created_at,\n    u.referral_link,\n    u.music_api_mode,\n    u.is_bot_kicked,\n    COALESCE(u.balance_wallet, 0) AS balance,\n    (SELECT COUNT(*) FROM pocketsound_users WHERE referrer_id = u.tg_id) AS referrals_count\n  FROM pocketsound_users u\n  WHERE u.tg_id = {{ $json.tg_id }}\n),\nsearch_stats AS (\n  SELECT COUNT(*) AS total_searches\n  FROM pocketsound_search_queries\n  WHERE user_id = (SELECT id FROM user_data)\n),\nfile_stats AS (\n  SELECT \n    COUNT(*) AS total_tracks_received,\n    json_agg(json_build_object('artist', artist, 'count', cnt) ORDER BY cnt DESC) AS top_artists\n  FROM (\n    SELECT artist, COUNT(*) AS cnt\n    FROM pocketsound_files\n    WHERE owner_user_id = (SELECT id FROM user_data)\n    GROUP BY artist\n    ORDER BY cnt DESC\n    LIMIT 5\n  ) t\n),\nplaylist_stats AS (\n  SELECT \n    COUNT(DISTINCT p.id) AS total_playlists,\n    COALESCE(SUM(pt.track_count), 0) AS total_tracks_in_playlists\n  FROM pocketsound_playlists p\n  LEFT JOIN (\n    SELECT playlist_id, COUNT(*) AS track_count\n    FROM pocketsound_playlist_tracks\n    GROUP BY playlist_id\n  ) pt ON pt.playlist_id = p.id\n  WHERE p.user_id = (SELECT id FROM user_data)\n),\nupload_stats AS (\n  SELECT COUNT(*) AS total_uploaded_files\n  FROM pocketsound_files\n  WHERE owner_user_id = (SELECT id FROM user_data)\n),\ndownload_stats AS (\n  SELECT COUNT(*) AS total_deezer_downloads\n  FROM pocketsound_download_queue\n  WHERE user_id = (SELECT id FROM user_data)\n    AND status = 'done'\n),\nshare_stats AS (\n  SELECT \n    COUNT(*) AS total_shares_sent\n  FROM pocketsound_file_shares\n  WHERE from_user_id = (SELECT id FROM user_data)\n)\nSELECT \n  u.*,\n  COALESCE(s.total_searches, 0) AS total_searches,\n  COALESCE(f.total_tracks_received, 0) AS total_tracks_received,\n  COALESCE(f.top_artists, '[]'::json) AS top_artists,\n  COALESCE(ps.total_playlists, 0) AS total_playlists,\n  COALESCE(ps.total_tracks_in_playlists, 0) AS total_tracks_in_playlists,\n  COALESCE(us.total_uploaded_files, 0) AS total_uploaded_files,\n  COALESCE(ds.total_deezer_downloads, 0) AS total_deezer_downloads,\n  COALESCE(ss.total_shares_sent, 0) AS total_shares_sent\nFROM user_data u\nCROSS JOIN search_stats s\nCROSS JOIN file_stats f\nCROSS JOIN playlist_stats ps\nCROSS JOIN upload_stats us\nCROSS JOIN download_stats ds\nCROSS JOIN share_stats ss;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        272,
+        352
+      ],
+      "id": "6568bd48-d82c-4f4e-a3db-b36f3109101a",
+      "name": "Get profile data",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json;\nif (!data || !data.tg_id) {\n  const chatId = $('Parse profile callback').item.json.chat_id;\n  return [{\n    json: {\n      chat_id: chatId,\n      text: \"❌ Profile not found. Please restart the bot with /start\",\n      parse_mode: 'HTML',\n      reply_markup: { inline_keyboard: [[{ text: '🔙 Back', callback_data: '/back' }]] }\n    }\n  }];\n}\n\nconst chatId = data.tg_id;\nconst username = data.tg_username ? '@' + data.tg_username : 'Not set';\nconst firstName = data.tg_first_name || '—';\nconst lastName = data.tg_last_name || '';\nconst fullName = firstName + (lastName ? ' ' + lastName : '');\nconst premium = data.premium ? '✅ Yes' : '❌ No';\nconst language = data.language_code || 'en';\nconst registered = new Date(data.created_at).toLocaleDateString('en-GB');\nconst referralLink = data.referral_link || '';\nconst balance = Number(data.balance).toFixed(2);\nconst referrals = data.referrals_count || 0;\n\nconst musicMode = data.music_api_mode ? '🎵 PRO Mode (Deezer)' : '📼 TG Mode (Telegram)';\nconst botKicked = data.is_bot_kicked ? '⚠️ Blocked' : '✅ Active';\n\n// Основные показатели (всегда показываем)\nconst totalSearches = data.total_searches || 0;\nconst totalTracks = data.total_tracks_received || 0;\nconst totalUploaded = data.total_uploaded_files || 0;\nconst totalDeezerDownloads = data.total_deezer_downloads || 0;\nconst totalPlaylists = data.total_playlists || 0;\nconst totalTracksInPlaylists = data.total_tracks_in_playlists || 0;\nconst totalShares = data.total_shares_sent || 0;\n\n// Собираем строки activity (порядок важен)\nlet activityLines = [\n  `• Searches: ${totalSearches}`,\n  `• Tracks received: ${totalTracks}`,\n  `• Uploaded files: ${totalUploaded}`,\n  `• Deezer downloads: ${totalDeezerDownloads}`,\n  `• Playlists created: ${totalPlaylists}`,\n  `• Tracks in playlists: ${totalTracksInPlaylists}`\n];\nif (totalShares > 0) {\n  activityLines.push(`• Shares sent: ${totalShares}`);\n}\nconst activitySection = `\\n\\n📊 <b>Activity:</b>\\n` + activityLines.join('\\n');\n\n// Топ артистов (только если есть)\nlet topArtistsSection = '';\nif (data.top_artists && Array.isArray(data.top_artists) && data.top_artists.length > 0) {\n  const artistsList = data.top_artists.map((a, i) => `${i+1}. ${a.artist} (${a.count} ${a.count === 1 ? 'track' : 'tracks'})`).join('\\n');\n  topArtistsSection = `\\n\\n🏆 <b>Top artists:</b>\\n${artistsList}`;\n}\n\n// Реферальная ссылка\nlet referralSection = '';\nif (referralLink) {\n  referralSection = `\\n\\n🔗 <b>Your referral link:</b>\\n${referralLink}`;\n} else {\n  referralSection = '\\n\\n🔗 <b>Your referral link:</b> not available';\n}\n\nconst text = `👤 <b>Profile</b>\n\n• Name: ${fullName}\n• Username: ${username}\n• Telegram Premium: ${premium}\n• Language: ${language}\n• Registered: ${registered}\n• Search mode: ${musicMode}\n• Bot status: ${botKicked}${activitySection}${topArtistsSection}\n\n💰 <b>Balance:</b> ${balance} coins\n👥 <b>Referrals:</b> ${referrals}${referralSection}\n\nShare your link with friends!\n\n@PocketSound_bot`;\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    text: text,\n    parse_mode: 'HTML',\n    reply_markup: {\n      inline_keyboard: [\n        [{ text: '🔙 Back', callback_data: '/back' }],\n        [{ text: '📂 My Playlists', callback_data: '/myplaylist' }]\n      ]\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        352
+      ],
+      "id": "194ff6a7-8bcf-40a0-8a2e-186985e781af",
+      "name": "Format profile message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    chat_id: $json.chat_id,\n    text: $json.text,\n    parse_mode: $json.parse_mode,\n    reply_markup: $json.reply_markup\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        688,
+        352
+      ],
+      "id": "f4b4ee0b-40a1-43d9-b15d-4f0e3f943e2c",
+      "name": "Send profile message"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1136,
+        352
+      ],
+      "id": "b75e4476-706d-4148-82b6-aa82cf83af06",
+      "name": "Done"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=👤 User usning Profile button 👤\n👤 👤 👤 👤 👤\nid: {{ $('Check user in DB').first().json.id }}\ntg_id: {{ $('Check user in DB').first().json.tg_id }}\nUsername: {{ $('Check user in DB').first().json.tg_username }}\nName: {{ $('Check user in DB').first().json.tg_first_name }}\n👤 👤 👤\n\nText from bot: \n{{ $json.result.text }}\n👤 👤 👤\nUser also see Buttons:\nBack\nMy Playlists"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $('Check user in DB').first().json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        912,
+        352
+      ],
+      "id": "f07d5476-570f-4c9f-b37c-5357ba87aa8f",
+      "name": "Notify admin about Profile click"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Parse profile callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse profile callback": {
+      "main": [
+        [
+          {
+            "node": "Check user in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check user in DB": {
+      "main": [
+        [
+          {
+            "node": "User banned?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User banned?": {
+      "main": [
+        [
+          {
+            "node": "Send banned message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Admin mode active?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Admin mode active?": {
+      "main": [
+        [
+          {
+            "node": "Send admin mode message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get profile data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send banned message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about banned user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send admin mode message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about admin mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get profile data": {
+      "main": [
+        [
+          {
+            "node": "Format profile message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format profile message": {
+      "main": [
+        [
+          {
+            "node": "Send profile message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send profile message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about Profile click",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify admin about Profile click": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "bebfd862-48ef-44e1-930e-579ca9939895",
+  "meta": {
+    "instanceId": "148b2b278c24b3c49bc4399db7e7ce15ed94f5b1044d28401c56f6ab511f0347"
+  },
+  "id": "3oWCFQ0oeCnMaBqj",
+  "tags": []
+}

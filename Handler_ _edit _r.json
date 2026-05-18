@@ -1,0 +1,3106 @@
+{
+  "name": "Handler: /edit /r",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1184,
+        -160
+      ],
+      "id": "aa703cee-758a-4df4-912a-11ab26f6f380",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract data from incoming webhook from Receiver\nconst body = $json.body;\nlet chatId = null;\nlet messageId = null;\nlet username = null;\nlet firstName = null;\nlet lastName = null;\nlet isPremium = false;\nlet languageCode = 'en';\nlet callbackData = null;\n\n// Check if it's a callback_query (button press)\nif (body.callback_query) {\n  const callback = body.callback_query;\n  const message = callback.message;\n  chatId = message.chat.id;\n  messageId = message.message_id;\n  username = message.chat.username || null;\n  firstName = message.chat.first_name || '';\n  lastName = message.chat.last_name || '';\n  isPremium = callback.from?.is_premium || false;\n  languageCode = callback.from?.language_code || 'en';\n  callbackData = callback.data;\n}\n// Check if it's a regular message\nelse if (body.message) {\n  const message = body.message;\n  chatId = message.chat.id;\n  messageId = message.message_id;\n  username = message.chat.username || null;\n  firstName = message.chat.first_name || '';\n  lastName = message.chat.last_name || '';\n  isPremium = message.from?.is_premium || false;\n  languageCode = message.from?.language_code || 'en';\n}\n\n// Parse callback data: /edit|action|playlistId|trackId\nlet action = null;\nlet subAction = null;\nlet playlistId = null;\nlet trackId = null;\nlet context = null;\n\nif (callbackData) {\n  const parts = callbackData.split('|');\n  subAction = parts[1] && parts[1].length > 0 ? parts[1] : null;\n  \n  if (subAction === 'rename') {\n    playlistId = parts[2] ? Number(parts[2]) : null;\n  } else if (subAction === 'delete') {\n    playlistId = parts[2] ? Number(parts[2]) : null;\n  } else if (subAction === 'tracks') {\n    playlistId = parts[2] ? Number(parts[2]) : null;\n  } else if (subAction === 'playlist') {\n    playlistId = parts[2] ? Number(parts[2]) : null;\n  } else if (subAction === 'confirm') {\n    context = parts[2];\n    if (context === 'delete') {\n      playlistId = parts[3] ? Number(parts[3]) : null;\n    } else if (context === 'delete_track') {\n      playlistId = parts[3] ? Number(parts[3]) : null;\n      trackId = parts[4] ? Number(parts[4]) : null;\n    }\n  } else if (subAction === 'cancel') {\n    context = parts[2];\n    if (context === 'delete') {\n      playlistId = parts[3] ? Number(parts[3]) : null;\n    } else if (context === 'delete_track') {\n      playlistId = parts[3] ? Number(parts[3]) : null;\n      trackId = parts[4] ? Number(parts[4]) : null;\n    } else if (context === 'rename') {\n      playlistId = parts[3] ? Number(parts[3]) : null;\n    }\n  } else if (subAction === 'show_track_for_deletion') {\n    playlistId = parts[2] ? Number(parts[2]) : null;\n    trackId = parts[3] ? Number(parts[3]) : null;\n    action = 'show_track_for_deletion';\n  }\n}\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    message_id: messageId,\n    username: username,\n    first_name: firstName,\n    last_name: lastName,\n    is_premium: isPremium,\n    language_code: languageCode,\n    sub_action: subAction,\n    action: action,\n    context: context,\n    playlist_id: playlistId,\n    track_id: trackId,\n    raw_callback: callbackData\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -960,
+        -160
+      ],
+      "id": "ab593e57-3a30-4701-b8e8-196a5e1a75ca",
+      "name": "Parse /edit command"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.chat_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -736,
+        -160
+      ],
+      "id": "a7547c6a-f124-444c-82da-9251487c5d40",
+      "name": "Check user in DB",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-banned",
+              "leftValue": "={{ $json.is_banned }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -512,
+        -160
+      ],
+      "id": "20b540be-88c5-477d-a327-3aae7e582319",
+      "name": "User banned?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-admin",
+              "leftValue": "={{ $json.admin_active }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -288,
+        -144
+      ],
+      "id": "9493d0bc-9bf2-4336-a3f4-1254e0544e20",
+      "name": "Admin mode active?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=⛔️ You are banned from using this bot.\n\nContact support: @PocketSound_bot\n\n/support\n@PocketSound_bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -512,
+        -320
+      ],
+      "id": "10d385ad-7b5a-4f0d-b26e-d12628505b8b",
+      "name": "Send banned message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=❄️ Admin mode is active. You cannot edit playlists.\n\n@PocketSound_bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -288,
+        -320
+      ],
+      "id": "17a02277-a662-441a-a333-44423d9f2c07",
+      "name": "Send admin mode message"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  p.id,\n  p.name,\n  COUNT(pt.id) AS tracks_count\nFROM pocketsound_playlists p\nLEFT JOIN pocketsound_playlist_tracks pt ON pt.playlist_id = p.id\nWHERE p.user_id = {{ $('Check user in DB').first().json.id }}\nGROUP BY p.id, p.name\nORDER BY p.created_at DESC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        -128
+      ],
+      "id": "72c57f56-36c4-4c9f-851f-a577233e53ff",
+      "name": "Get user playlists",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=⛔️ BANNED USER TRIED TO Edit Playlist Button ⛔️\n\nUser: @{{ $('Parse /edit command').item.json.username }}\nTG ID: {{ $('Parse /edit command').item.json.chat_id }}\nBan reason: {{ $json.ban_reason || 'N/A' }}\n\n❄️ Admin mode is ACTIVE for this user.\n\nTo unban: `/admin_false {{ $('Parse /edit command').item.json.chat_id }}`"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4c42b0db-d7d1-4c95-8b4b-7f5d4cd7fdc3",
+      "name": "Notify admin about banned user",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -512,
+        -512
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔄 User pressed My Playlists Button (Admin mode ACTIVE)\n\nUser: @{{ $('Parse /edit command').item.json.username }}\nTG ID: {{ $('Parse /edit command').item.json.chat_id }}\nFirst name: {{ $('Parse /edit command').item.json.first_name }}\nPremium: {{ $('Parse /edit command').item.json.is_premium }}\n\n❄️ Admin dialog is active. User cannot use MENU Button."
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "292795a0-cd89-4230-8852-03e6a223e86f",
+      "name": "Notify admin about MyPlaylists button",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -288,
+        -496
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3d4b7ff3-8770-4151-a0e1-20ab99b9ce02",
+              "leftValue": "={{ $input.all().length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        208,
+        -128
+      ],
+      "id": "03965a73-ec37-4395-953a-9f3109179c45",
+      "name": "More then 0?"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.sub_action }}",
+                    "rightValue": "menu",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "35f20c96-f9c0-4a13-bd7c-877750dc039e"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Menu edit button"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "44685c90-3d71-40c8-82a7-f575353dd17a",
+                    "leftValue": "={{ $json.sub_action }}",
+                    "rightValue": "=playlist",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Playlist choose"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "08f354bc-1b90-4d79-829c-05c1c76df6e6",
+                    "leftValue": "={{ $json.sub_action }}",
+                    "rightValue": "rename",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Playlist Rename"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "4718c335-fffe-4ad2-a897-659b07c28ca5",
+                    "leftValue": "={{ $json.sub_action }}",
+                    "rightValue": "delete",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Delete"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "b9178dd3-c2c9-47f1-ab63-765fbf93e539",
+                    "leftValue": "={{ $json.sub_action }}",
+                    "rightValue": "tracks",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Tracks"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "de2e9430-5421-4a4d-8fea-7249df9331ce",
+                    "leftValue": "={{ $json.sub_action }}",
+                    "rightValue": "confirm",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Confirm"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "0d91bbda-0d8a-4cb9-8c5a-92e81cd5c9eb",
+                    "leftValue": "={{ $json.sub_action }}",
+                    "rightValue": "cancel",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Cancel"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "112a35a5-088b-4c3d-818d-6ca5adb67c39",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "show_track_for_deletion",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Show Track For Deletion"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        880,
+        -240
+      ],
+      "id": "9ef9f360-eaaa-4999-9e48-1b44417b436b",
+      "name": "Switch Edit"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.chat_id }}"
+            },
+            {
+              "name": "message",
+              "value": "Which playist you want to edit?"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ \n  {\n    chat_id: $json.chat_id,\n    text: '✏️ Edit Playlists (' + $json.total_playlists + '/3)\\n\\nSelect a playlist to edit:\\n\\n@PocketSoundbot',\n    parse_mode: 'HTML',\n    reply_markup: {\n      inline_keyboard: $json.inline_keyboard\n    }\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1728,
+        -1088
+      ],
+      "id": "97482577-9bbb-460b-9d92-0c6fa3eaed3b",
+      "name": "send message edit playlists",
+      "notes": "Отправка сообщения пользователя в топик"
+    },
+    {
+      "parameters": {
+        "jsCode": "const playlists = $('Get user playlists').all();\nconst chatId = $json.chat_id;\n\nconst inline_keyboard = playlists.map(playlist => ([\n  {\n    text: `✏️ ${playlist.json.name} (${playlist.json.tracks_count}/33)`,\n    callback_data: `/edit|playlist|${playlist.json.id}`\n  }\n]));\n\ninline_keyboard.push([\n  {\n    text: '🔙 Back',\n    callback_data: '/back'\n  }\n]);\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    inline_keyboard: inline_keyboard,\n    total_playlists: playlists.length\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1488,
+        -1088
+      ],
+      "id": "c8630369-e2b2-41ab-8f6a-cb385713b68c",
+      "name": "Edit Playlists Buttons"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2448,
+        -1088
+      ],
+      "id": "2a55e51b-8271-4db7-911f-65aa357238c6",
+      "name": "No Operation, do nothing48"
+    },
+    {
+      "parameters": {
+        "jsCode": "const playlistData = $('Get Playlist Details').first().json;\nconst playlistId = playlistData.id;\nconst chatId = $('Parse Playlist View Callback edit').first().json.chat_id;\n\nconst playlistName = playlistData.name;\nconst tracksCount = playlistData.tracks_count;\n\nconst inline_keyboard = [\n  [\n    {\n      text: '✏️ Rename Playlist',\n      callback_data: `/edit|rename|${playlistId}`\n    }\n  ],\n  [\n    {\n      text: '🗑️ Delete Playlist',\n      callback_data: `/edit|delete|${playlistId}`\n    }\n  ]\n];\n\nif (tracksCount > 0) {\n  inline_keyboard.push([\n    {\n      text: '🎵 Edit Tracks in Playlist',\n      callback_data: `/edit|tracks|${playlistId}`\n    }\n  ]);\n}\n\ninline_keyboard.push([\n  {\n    text: '🔙 Back',\n    callback_data: '/back'\n  }\n]);\n\nlet messageText = `✏️ Edit: <b>${playlistName}</b>\\n🎵 Tracks: ${tracksCount}/33\\n\\nWhat do you want to do?`;\nif (tracksCount === 0) {\n  messageText += `\\n\\n💡 Add tracks to playlist and the \"Edit Tracks in Playlist\" button will appear.`;\n}\nmessageText += `\\n\\n@PocketSound_bot`;\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    playlist_name: playlistName,\n    tracks_count: tracksCount,\n    playlist_id: playlistId,\n    text: messageText,\n    parse_mode: 'HTML',\n    inline_keyboard: inline_keyboard\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1744,
+        -896
+      ],
+      "id": "64582aeb-2065-4bb3-adac-cfeece25c285",
+      "name": "Format Playlist Edit Actions"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  p.id,\n  p.name,\n  COUNT(pt.id)::INTEGER AS tracks_count\nFROM pocketsound_playlists p\nLEFT JOIN pocketsound_playlist_tracks pt ON pt.playlist_id = p.id\nWHERE p.id = {{ $json.playlist_id }}\nGROUP BY p.id, p.name\nLIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1488,
+        -896
+      ],
+      "id": "31e08086-bb48-49e0-9a20-b38965656557",
+      "name": "Get Playlist Details",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2624,
+        -896
+      ],
+      "id": "5748434a-86e6-4966-a821-e30574895005",
+      "name": "No Operation, do nothing51"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO pocketsound_user_states (user_id, current_state, state_started_at, updated_at)\nVALUES (\n  {{ $('Check user in DB').first().json.id }},\n  'awaiting_playlist_name|rename|{{ $json.playlist_id }}',\n  NOW(),\n  NOW()\n)\nON CONFLICT (user_id) DO UPDATE\nSET\n  current_state = 'awaiting_playlist_name|rename|{{ $json.playlist_id }}',\n  state_started_at = NOW(),\n  updated_at = NOW();",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1488,
+        -704
+      ],
+      "id": "2a35809b-5926-48c1-bdaf-922cdf382f61",
+      "name": "Playlist rename timer",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Parse Playlist View Callback edit').item.json.chat_id }}"
+            },
+            {
+              "name": "message",
+              "value": "Which playist you want to edit?"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    chat_id: $('Parse Playlist View Callback edit').first().json.chat_id,\n    text: '✏️ Send a new playlist name.\\n\\nYou have 10 minutes.\\n\\n@PocketSoundbot',\n    reply_markup: {\n      inline_keyboard: [\n        [\n          {\n            text: '❌ Cancel',\n            callback_data: '/edit|cancel|rename|' + $('Parse Playlist View Callback edit').first().json.playlist_id\n          }\n        ]\n      ]\n    }\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1728,
+        -704
+      ],
+      "id": "39bee42d-72fb-420a-8a84-7bb524c20e45",
+      "name": "send message edit playlists name",
+      "notes": "Отправка сообщения пользователя в топик"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2400,
+        -704
+      ],
+      "id": "4aa0ba2d-d313-4126-9aed-dd1b279c08da",
+      "name": "No Operation, do nothing53"
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first().json;\n\n// chat_id берем из parse-ноды (стабильно для этой ветки)\nconst chatId = $('Parse Playlist View Callback edit').first().json.chat_id;\n\n// страховка, если SQL ничего не вернул\nif (!row || !row.id) {\n  return [{\n    json: {\n      chat_id: chatId,\n      text: '❌ Playlist not found or access denied.\\n\\n@PocketSoundbot',\n      reply_markup: {\n        inline_keyboard: [\n          [{ text: '🔙 Back to Edit', callback_data: '/edit|' }]\n        ]\n      }\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    text:\n      `⚠️ Are you sure you want to delete playlist <b>${row.name}</b>?\\n` +\n      `It currently has ${row.tracks_count}/33 tracks.\\n\\n` +\n      `This action cannot be undone.\\n\\n@PocketSoundbot`,\n    parse_mode: 'HTML',\n    reply_markup: {\n      inline_keyboard: [\n        [{ text: '✅ Confirm Delete', callback_data: `/edit|confirm|delete|${row.id}` }],\n        [{ text: '❌ Cancel', callback_data: `/edit|cancel|delete|${row.id}` }]\n      ]\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1712,
+        -512
+      ],
+      "id": "88aee8d5-bff7-47f7-8ff8-0808793b6274",
+      "name": "Message Craft"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Parse Playlist View Callback edit').item.json.chat_id }}"
+            },
+            {
+              "name": "message",
+              "value": "Which playist you want to edit?"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    chat_id: $json.chat_id,\n    text: $json.text,\n    parse_mode: $json.parse_mode,\n    reply_markup: $json.reply_markup\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1952,
+        -512
+      ],
+      "id": "65528b54-5939-435a-93b9-7344cb4ef60f",
+      "name": "send message delete playlist?",
+      "notes": "Отправка сообщения пользователя в топик"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔡 User clicked Delete Playlist \n\nMessage from bot: \n{{ $('send message delete playlist?').item.json.result.text }}\n\nAnd See the buttons\n\nConfirm\nCancel"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2400,
+        -512
+      ],
+      "id": "1ae95f68-1344-4d37-aea0-8a34c9a7d399",
+      "name": "Передаем инфо/сообщение пользователя в группу поддержки38",
+      "notes": "Отправка сообщения пользователя в топик"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2624,
+        -512
+      ],
+      "id": "dd92e79e-f3f9-477a-bc55-c24321df5b40",
+      "name": "No Operation, do nothing54"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Parse Playlist View Callback edit').item.json.chat_id }}"
+            },
+            {
+              "name": "message",
+              "value": "=Playlist {{ $json.name }} has been deleted"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    chat_id: $('Parse Playlist View Callback edit').first().json.chat_id,\n    text: '✅ Playlist deleted successfully.\\n\\n@PocketSoundbot',\n    parse_mode: 'HTML',\n    reply_markup: {\n      inline_keyboard: [\n        [\n          {\n            text: '📂 My Playlists',\n            callback_data: '/myplaylist'\n          }\n        ],\n        [\n          {\n            text: '🔙 Back to Menu',\n            callback_data: '/menu'\n          }\n        ]\n      ]\n    }\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2304,
+        304
+      ],
+      "id": "44db0f43-e063-4840-b79b-8f5d16b41ff0",
+      "name": "send message delete confirm",
+      "notes": "Отправка сообщения пользователя в топик"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        3168,
+        304
+      ],
+      "id": "bb187d09-01d6-4e3a-90c7-d8725f72a4d2",
+      "name": "No Operation, do nothing55"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b18c7445-8d2d-4684-8e66-3b5b2913db4b",
+              "leftValue": "={{ $input.all().length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1664,
+        -144
+      ],
+      "id": "7170e6ee-3d45-47dd-9291-2bd3293e6336",
+      "name": "No Playlist ?2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔡 User clicked \"Send All Tracks\" Button!\n\nUsername: @{{ $json.tg_username }}\nFirst Name: {{ $json.tg_first_name }}\nTGID: {{ $json.tg_id }}\n\nNo playlists = Create Playlist & Back buttons\n\nOr clicked on button which was shown long time ago"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2528,
+        -320
+      ],
+      "id": "68ec1263-b471-49cb-8cb3-a62f190083d2",
+      "name": "Передаем инфо/сообщение пользователя в группу поддержки43",
+      "notes": "Отправка сообщения пользователя в топик"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list",
+          "cachedResultName": "pocketsound_users"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.result.chat.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2304,
+        -320
+      ],
+      "id": "706a39c5-4e43-4262-9bb3-2753c437af52",
+      "name": "user есть в DB?52",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "Проверяем есть ли пользователь в DB"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2752,
+        -320
+      ],
+      "id": "395f55c8-5190-4088-a94a-2f590e7259f0",
+      "name": "No Operation, do nothing58"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔴 User clicked Delete tracks from Playlist\n\nAnd See the buttons\nwith Songs + Send All Button + Edit Playlist\nBack to Playlists\n\nUsername: @{{ $json.tg_username }}\nFirst Name: {{ $json.tg_first_name }}\nTGID: {{ $json.tg_id }}"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2736,
+        -128
+      ],
+      "id": "b36c336a-5513-45c9-863d-ffad04f52733",
+      "name": "Передаем инфо/сообщение пользователя в группу поддержки45",
+      "notes": "Отправка сообщения пользователя в топик"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list",
+          "cachedResultName": "pocketsound_users"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.result.chat.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2528,
+        -128
+      ],
+      "id": "f134cd06-aa23-4079-b2a4-129790dec43d",
+      "name": "user есть в DB?53",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "Проверяем есть ли пользователь в DB"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2944,
+        -128
+      ],
+      "id": "04494f7a-60be-4d86-9209-8fb2fa7f6f82",
+      "name": "No Operation, do nothing59"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  f.id,\n  f.title,\n  f.artist,\n  f.duration,\n  f.tg_chat_id,\n  f.message_id,\n  pt.position\nFROM pocketsound_playlist_tracks pt\nJOIN pocketsound_files f ON f.id = pt.file_id\nWHERE pt.playlist_id = {{ $('No Playlist ?2').first().json.id }}\nORDER BY pt.position ASC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1872,
+        -128
+      ],
+      "id": "cf9b75fd-587f-41fb-ae69-f8cf1adb8fdf",
+      "name": "Get Playlist Tracks2",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Получаем chat_id из ноды, которая обрабатывает callback\nconst chat_id = $('Parse Playlist View Callback edit').first().json.chat_id;\n\nconst tracks = $('Get Playlist Tracks2').all();\nconst playlistData = $('SQL Get Users playlists').first().json;\nconst playlistName = playlistData.name;\nconst playlistId = playlistData.id;\nconst totalTracks = tracks.length;\n\n// Берем первые 10 треков\nconst firstTenTracks = tracks.slice(0, 10);\n\nconst inline_keyboard = firstTenTracks.map(track => ([\n  {\n    text: `🎵 ${track.json.artist} - ${track.json.title}`,\n    callback_data: `/edit|show_track_for_deletion|${playlistId}|${track.json.id}`  // покажет файл с кнопками\n  }\n]));\n\n// Если треков больше 10, добавляем кнопку \"More...\"\nif (totalTracks > 10) {\n  inline_keyboard.push([\n    {\n      text: `▶️ More... (10/${totalTracks})`,\n      callback_data: `playlist_more|${playlistId}|10`\n    }\n  ]);\n}\n\n// Кнопка \"Send All\"\ninline_keyboard.push([\n  {\n    text: `📤 Send All Tracks (${totalTracks})`,\n    callback_data: `playlist_send_all|${playlistId}`\n  }\n]);\n\n// Кнопка \"Edit Playlist\"\ninline_keyboard.push([\n  {\n    text: '✏️ Edit Playlist',\n    callback_data: `/edit|playlist|${playlistId}`\n  }\n]);\n\n// Кнопка \"Back\"\ninline_keyboard.push([\n  {\n    text: '🔙 Back to Playlists',\n    callback_data: '/myplaylist'\n  }\n]);\n\nreturn [{\n  json: {\n    playlist_name: playlistName,\n    total_tracks: totalTracks,\n    inline_keyboard: inline_keyboard,\n    playlist_id: playlistId,\n    chat_id: chat_id\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2064,
+        -128
+      ],
+      "id": "efcbcc6d-af1c-436c-bf2c-39a02c49638d",
+      "name": "Format Playlist Tracks (First 10)2"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  f.id,\n  f.title,\n  f.artist,\n  f.file_name,\n  f.file_unique_id,\n  f.tg_chat_id,\n  f.message_id,\n  f.duration,\n  f.file_size,\n  f.mime_type\nFROM pocketsound_files f\nWHERE f.id = {{ $json.track_id }}\nLIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1792,
+        800
+      ],
+      "id": "ee9e00a1-435f-48f6-b441-def788809f7a",
+      "name": "Show Track For Deletion",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const track = $input.first().json;\nconst callbackData = $('Parse Playlist View Callback edit').first().json;\nconst chatId = callbackData.chat_id;\nconst playlistId = callbackData.playlist_id;\nconst trackId = track.id;\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    from_chat_id: track.tg_chat_id,\n    message_id: track.message_id,\n    text: `⚠️ Are you sure you want to delete track\\n<b>${track.artist} - ${track.title}</b> from playlist?\\n\\nThis action cannot be undone.\\n\\n@PocketSoundbot`,\n    parse_mode: 'HTML',\n    reply_markup: {\n      inline_keyboard: [\n        [\n          {\n            text: '✅ Confirm Delete',\n            callback_data: `/edit|confirm|delete_track|${playlistId}|${trackId}`\n          },\n          {\n            text: '❌ Cancel',\n            callback_data: `/edit|cancel|delete_track|${playlistId}|${trackId}`\n          }\n        ]\n      ]\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        800
+      ],
+      "id": "297eb8da-d0b2-4112-80d5-cf2688122066",
+      "name": "Prepare Audio with Delete Buttons"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/copyMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ \n  {\n    chat_id: $json.chat_id,\n    from_chat_id: $json.from_chat_id,\n    message_id: $json.message_id,\n    caption: $json.text,\n    parse_mode: $json.parse_mode,\n    reply_markup: $json.reply_markup\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2208,
+        800
+      ],
+      "name": "Send Audio with Delete Buttons",
+      "id": "ca9b34e6-d153-4d66-bb88-affb79fc27a5"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔴 User want to Delete song from playlist ✔️\n"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2640,
+        800
+      ],
+      "id": "299c2f0f-08aa-41f2-9252-65a56102975d",
+      "name": "Передаем инфо/сообщение пользователя в группу поддержки46",
+      "notes": "Отправка сообщения пользователя в топик"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list",
+          "cachedResultName": "pocketsound_users"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $('Prepare Audio with Delete Buttons').item.json.chat_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2432,
+        800
+      ],
+      "id": "78447942-17eb-4a08-b87e-31d5f7409f5b",
+      "name": "user есть в DB?54",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "Проверяем есть ли пользователь в DB"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2848,
+        800
+      ],
+      "id": "0767a719-749d-4c4f-8bbb-be05612d2d0c",
+      "name": "No Operation, do nothing60"
+    },
+    {
+      "parameters": {
+        "jsCode": "const context = $('Parse Playlist View Callback edit').first().json.context;\n\nreturn [{\n  json: {\n    context: context\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1616,
+        160
+      ],
+      "id": "ce2d3ac9-525b-4f6b-a0af-49242df870a3",
+      "name": "Check Confirm Type"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.context }}",
+                    "rightValue": "delete_track",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "1a005d1c-bb87-4ac0-9020-7f5f80121d92"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Delete Track"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "98283981-2080-4120-8863-644fcad5169f",
+                    "leftValue": "={{ $json.context }}",
+                    "rightValue": "delete",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Delete Playlist"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1824,
+        160
+      ],
+      "id": "edf8bf3d-e8df-4b5a-96bd-c853314fd8ea",
+      "name": "Switch Confirm Type"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "DELETE FROM pocketsound_playlist_tracks\nWHERE playlist_id = {{ $('Parse Playlist View Callback edit').first().json.playlist_id }}\n  AND file_id = {{ $('Parse Playlist View Callback edit').first().json.track_id }}\nRETURNING playlist_id, file_id;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2096,
+        96
+      ],
+      "id": "ed1f9a94-f128-4eda-a02b-04f39e24bacc",
+      "name": "Delete Track From Playlist",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.first().json;\nconst callbackData = $('Parse Playlist View Callback edit').first().json;\nconst chatId = callbackData.chat_id;\nconst playlistId = callbackData.playlist_id;\n\nif (result && result.playlist_id) {\n  return [{\n    json: {\n      chat_id: chatId,\n      text: '✅ Track successfully removed from playlist!\\n\\n@PocketSoundbot',\n      reply_markup: {\n        inline_keyboard: [\n          [{ text: '🎵 Back to Tracks', callback_data: `/edit|tracks|${playlistId}` }],\n          [{ text: '🔙 Back to Playlists', callback_data: '/myplaylist' }]\n        ]\n      }\n    }\n  }];\n} else {\n  return [{\n    json: {\n      chat_id: chatId,\n      text: '❌ Failed to remove track.\\n\\n@PocketSoundbot',\n      reply_markup: {\n        inline_keyboard: [\n          [{ text: '🔙 Back to Tracks', callback_data: `/edit|tracks|${playlistId}` }]\n        ]\n      }\n    }\n  }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2304,
+        96
+      ],
+      "id": "1151a659-268f-4ac6-b76f-3f09fb43a16e",
+      "name": "Send Track Delete Success Message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Parse Playlist View Callback edit').item.json.chat_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    chat_id: $json.chat_id,\n    text: $json.text,\n    reply_markup: $json.reply_markup\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2560,
+        96
+      ],
+      "id": "63b32fd4-9c78-48ad-b844-f6bce26f2ca2",
+      "name": "send message delete confirm1",
+      "notes": "Отправка сообщения пользователя в топик"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔴🔴 User Deleted track from Playlist 🔴🔴\nSong Deleted"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3056,
+        96
+      ],
+      "id": "f2ec7471-e2d2-423d-b2cf-b80f630d8a20",
+      "name": "Передаем инфо/сообщение пользователя в группу поддержки47",
+      "notes": "Отправка сообщения пользователя в топик"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list",
+          "cachedResultName": "pocketsound_users"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.result.chat.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2832,
+        96
+      ],
+      "id": "ea736c42-ba8c-474f-bbcc-e8fd3656bc6b",
+      "name": "user есть в DB?55",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "Проверяем есть ли пользователь в DB"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        3504,
+        96
+      ],
+      "id": "b0c5748f-59b5-435c-ae95-13af503c0fd1",
+      "name": "No Operation, do nothing61"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "DELETE FROM pocketsound_playlists\nWHERE id = {{ $('Parse Playlist View Callback edit').first().json.playlist_id }}\n  AND user_id = {{ $('Check user in DB').first().json.id }}\nRETURNING id, name;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2096,
+        304
+      ],
+      "id": "2736fe16-31bc-4c7b-8f16-b0477b528a08",
+      "name": "Delete Playlist",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        864,
+        144
+      ],
+      "id": "e57d9153-d797-4c08-98c2-e4461e8dfb23",
+      "name": "No Operation, do nothing49"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=You \n@PocketSound_bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        144
+      ],
+      "id": "4e1dad45-2413-4789-b1db-3cc9590297aa",
+      "name": "Send no playlists message"
+    },
+    {
+      "parameters": {
+        "jsCode": "const callbackData = $('Parse /edit command').first().json.raw_callback || '';\nconst parts = callbackData.split('|');\n\nconst subAction = parts[1] && parts[1].length > 0 ? parts[1] : 'menu';\nlet action = parts[2] || null;\nlet context = null;\nlet playlistId = null;\nlet trackId = null;\nlet cancelAction = null;\n\nif (subAction === 'show_track_for_deletion') {\n  playlistId = parts[2] ? Number(parts[2]) : null;\n  trackId = parts[3] ? Number(parts[3]) : null;\n  action = 'show_track_for_deletion';\n}\nelse if (subAction === 'confirm' && parts[2] === 'delete_track') {\n  playlistId = parts[3] ? Number(parts[3]) : null;\n  trackId = parts[4] ? Number(parts[4]) : null;\n  context = 'delete_track';\n}\nelse if (subAction === 'cancel' && parts[2] === 'delete_track') {\n  playlistId = parts[3] ? Number(parts[3]) : null;\n  trackId = parts[4] ? Number(parts[4]) : null;\n  context = 'delete_track';\n  cancelAction = 'delete_track';\n}\nelse if (subAction === 'confirm' && parts[2] === 'delete') {\n  context = 'delete';\n  playlistId = parts[3] ? Number(parts[3]) : null;\n}\nelse if (subAction === 'cancel' && parts[2] === 'delete') {\n  context = 'delete';\n  playlistId = parts[3] ? Number(parts[3]) : null;\n  cancelAction = 'delete_playlist';\n}\nelse if (subAction === 'cancel' && parts[2] === 'rename') {\n  context = 'rename';\n  playlistId = parts[3] ? Number(parts[3]) : null;\n  cancelAction = 'rename_playlist';\n}\nelse if (subAction === 'confirm' || subAction === 'cancel') {\n  context = parts[2] || null;\n  playlistId = parts[3] ? Number(parts[3]) : null;\n}\nelse {\n  playlistId = parts[2] ? Number(parts[2]) : null;\n}\n\nif (isNaN(playlistId)) playlistId = null;\nif (isNaN(trackId)) trackId = null;\n\nconst chatData = $('Parse /edit command').first().json;\n\nreturn [{\n  json: {\n    sub_action: subAction,\n    action: action,\n    context: context,\n    cancel_action: cancelAction,\n    playlist_id: playlistId,\n    track_id: trackId,\n    chat_id: chatData.chat_id,\n    message_id: chatData.message_id,\n    raw_callback: callbackData\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        -144
+      ],
+      "id": "c7bc8aaa-607b-472e-82a1-360247fb3aa3",
+      "name": "Parse Playlist View Callback edit"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list",
+          "cachedResultName": "pocketsound_users"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.result.chat.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2000,
+        -1088
+      ],
+      "id": "0096e045-a9c2-48d5-8c28-27ccb55e6695",
+      "name": "user in DB check",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "Проверяем есть ли пользователь в DB"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔡 User clicked Edit Playlist \n\nAnd See the buttons\nwith Available Playlists\n\nUsername: @{{ $json.tg_username }}\nFirst Name: {{ $json.tg_first_name }}\nTGID: {{ $json.tg_id }}"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2224,
+        -1088
+      ],
+      "id": "19cd44d0-78af-411d-b714-0812222173cf",
+      "name": "Send Message to admin topic",
+      "notes": "Отправка сообщения пользователя в топик"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list",
+          "cachedResultName": "pocketsound_users"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.result.chat.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2176,
+        -896
+      ],
+      "id": "eb36da9f-24d9-4b6c-8b5a-503f5a9c8e33",
+      "name": "user is DB check for edit playlist",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "Проверяем есть ли пользователь в DB"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔡 User clicked Edit Playlist \n\nMessage from bot: \n{{ $('Send message edit playlist').item.json.result.text }}\n\nAnd See the buttons:\n{{ $('Send message edit playlist').item.json.result.reply_markup.inline_keyboard[0][0].text }}\n\n{{ $('Send message edit playlist').item.json.result.reply_markup.inline_keyboard[1][0].text }}\n\n{{ $('Send message edit playlist').item.json.result.reply_markup.inline_keyboard[2][0].text }}\n"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2400,
+        -896
+      ],
+      "id": "eb6db345-13f3-4245-9e14-dccd244902d2",
+      "name": "Send message to topic group",
+      "notes": "Отправка сообщения пользователя в топик"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list",
+          "cachedResultName": "pocketsound_users"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.result.chat.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1952,
+        -704
+      ],
+      "id": "d3a56592-102b-4612-bfe2-47cb15d4424a",
+      "name": "user in DB?",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "Проверяем есть ли пользователь в DB"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔡 User clicked Edit Playlists\n\nMessage from bot: {{ $('send message edit playlists name').item.json.result.text }}\n\nAlso see 2 buttons\n1 Edit/name\n2 Cancel\n"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2176,
+        -704
+      ],
+      "id": "a02e0b86-4139-4916-9355-7e44b46ba317",
+      "name": "Send message to admin topic",
+      "notes": "Отправка сообщения пользователя в топик"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  p.id,\n  p.name,\n  COUNT(pt.id)::INTEGER AS tracks_count\nFROM pocketsound_playlists p\nLEFT JOIN pocketsound_playlist_tracks pt ON pt.playlist_id = p.id\nWHERE p.id = {{ $json.playlist_id }}\n  AND p.user_id = {{ $('Check user in DB').first().json.id }}\nGROUP BY p.id, p.name\nLIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1504,
+        -512
+      ],
+      "id": "a40fb41e-d2db-40ff-a71d-51e8c43a53a2",
+      "name": "Get Playlist",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  p.id,\n  p.name,\n  p.description,\n  COUNT(pt.id) AS tracks_count,\n  p.created_at\nFROM pocketsound_playlists p\nLEFT JOIN pocketsound_playlist_tracks pt ON pt.playlist_id = p.id\nWHERE p.id = {{ $('Parse Playlist View Callback edit').first().json.action }}\n  AND p.user_id = {{ $('Check user in DB').first().json.id }}\nGROUP BY p.id, p.name, p.description, p.created_at\nORDER BY p.created_at DESC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1488,
+        -144
+      ],
+      "id": "2f928bac-1375-4f69-8459-0d15f3ea62d4",
+      "name": "SQL Get Users playlists",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔡 User doesnt have anything to Edit\n\nUsername: @{{ $json.tg_username }}\nFirst Name: {{ $json.tg_first_name }}\nTGID: {{ $json.tg_id }}"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        656,
+        144
+      ],
+      "id": "1b054461-2bf9-4919-b4e8-200d44db8585",
+      "name": "Send message to admin topic group",
+      "notes": "Отправка сообщения пользователя в топик"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list",
+          "cachedResultName": "pocketsound_users"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.result.chat.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        448,
+        144
+      ],
+      "id": "f5b53f77-7eaa-4d43-9797-5b77e89291d2",
+      "name": "Check user in DB now",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "Проверяем есть ли пользователь в DB"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        3056,
+        560
+      ],
+      "id": "fcbac49c-2661-4260-877b-7f4a7efd0bf3",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE pocketsound_user_states\nSET current_state = NULL,\n    state_data = NULL,\n    state_started_at = NULL,\n    updated_at = NOW()\nWHERE user_id = {{ $('Check user in DB').first().json.id }};",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2640,
+        560
+      ],
+      "id": "f90358bf-f5ba-469b-a1b9-74bc0e6628d8",
+      "name": "Clear user state",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "Delete 10 min timer (Bot is no longer waiting for playlist name)"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list",
+          "cachedResultName": "pocketsound_users"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.chat_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1792,
+        560
+      ],
+      "id": "2789d095-2188-4e19-ae07-7184b9aeef0e",
+      "name": "is user DB?",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "Проверяем есть ли пользователь в DB"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔡 User clicked Cancel button\n\nMessage from bot: \n{{ $json.result.text }}\n"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $('is user DB?').item.json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2432,
+        560
+      ],
+      "id": "f57093f9-c7c4-4c59-a5af-08626c1d4f90",
+      "name": "Send message to admin topic1",
+      "notes": "Отправка сообщения пользователя в топик"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list",
+          "cachedResultName": "pocketsound_users"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.result.chat.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2176,
+        -512
+      ],
+      "id": "1a829533-9d7e-4512-9672-699fa9917952",
+      "name": "user DB checking",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "Проверяем есть ли пользователь в DB"
+    },
+    {
+      "parameters": {
+        "jsCode": "const cancelAction = $('Parse Playlist View Callback edit').first().json.cancel_action;\nlet message = '';\n\nif (cancelAction === 'rename_playlist') {\n  message = '✅ Playlist renaming cancelled.\\n\\n@PocketSound_bot';\n} else if (cancelAction === 'delete_playlist') {\n  message = '✅ Playlist deletion cancelled.\\n\\n@PocketSound_bot';\n} else if (cancelAction === 'delete_track') {\n  message = '✅ Track deletion cancelled.\\n\\n@PocketSound_bot';\n} else {\n  message = '✅ Action cancelled.\\n\\n@PocketSound_bot';\n}\n\nreturn [{\n  json: {\n    chat_id: $('Parse Playlist View Callback edit').first().json.chat_id,\n    text: message\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        560
+      ],
+      "id": "52d810ac-ab2f-4cfd-b444-9a8a065fe6df",
+      "name": "Code for cancel state"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/deleteMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Parse Playlist View Callback edit').item.json.chat_id }}"
+            },
+            {
+              "name": "message_id",
+              "value": "={{ $('Parse Playlist View Callback edit').item.json.message_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2848,
+        560
+      ],
+      "id": "9c716e83-db01-4d98-85d0-d02ed60f9e72",
+      "name": "delete message cause action canceled"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Parse Playlist View Callback edit').item.json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.text }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2208,
+        560
+      ],
+      "id": "d7b11718-0d12-4e48-9398-bb1b370ac1ee",
+      "name": "Send cancel message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.chat_id }}"
+            },
+            {
+              "name": "caption",
+              "value": "@PocketSound_bot"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ \n  {\n    chat_id: $json.chat_id,\n    text: '📂 Playlist: <b>' + $json.playlist_name + '</b>\\n🎵 Total tracks: ' + $json.total_tracks + '\\n\\nClick on tracks which you want to delete from your playlist\\n\\n@PocketSoundbot',\n    parse_mode: 'HTML',\n    reply_markup: {\n      inline_keyboard: $json.inline_keyboard\n    }\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2304,
+        -128
+      ],
+      "id": "b1d7aa71-d3b8-4641-b096-b8c8c0750b7f",
+      "name": "Send message to topic about user",
+      "notes": "Отправка сообщения пользователя в топик"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendPhoto",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Parse /edit command').item.json.chat_id }}"
+            },
+            {
+              "name": "photo",
+              "value": "https://silver-perfect-barracuda-186.mypinata.cloud/ipfs/bafkreidjuficdk5vzzdga5xua2rjj657ka276jft4m4ootwag7227bxtny"
+            },
+            {
+              "name": "caption",
+              "value": "📂 No Playlists Found or Tracks Found\n\n@PocketSound_bot"
+            },
+            {
+              "name": "reply_markup",
+              "value": "{\"inline_keyboard\":[[{\"text\":\"➕ Create Playlist\",\"callback_data\":\"Create\"}],[{\"text\":\"🔙 Back\",\"callback_data\":\"/back\"}]]}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2080,
+        -320
+      ],
+      "id": "f06164ba-08aa-4b5a-a27d-0f7ce51ba966",
+      "name": "No playlists found for tracks send all1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/deleteMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Parse Playlist View Callback edit').item.json.chat_id }}"
+            },
+            {
+              "name": "message_id",
+              "value": "={{ $('Parse Playlist View Callback edit').item.json.message_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3280,
+        96
+      ],
+      "id": "fdd83cf9-52a0-4ac0-a215-0cfcf9bc506a",
+      "name": "delete message cause action delete track"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/deleteMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Parse Playlist View Callback edit').item.json.chat_id }}"
+            },
+            {
+              "name": "message_id",
+              "value": "={{ $('Parse Playlist View Callback edit').item.json.message_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2544,
+        304
+      ],
+      "id": "59c07398-9b68-467f-9222-d6acb140d3bd",
+      "name": "delete message cause action delete playlist"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list",
+          "cachedResultName": "pocketsound_users"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $('send message delete confirm').item.json.result.chat.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2752,
+        304
+      ],
+      "id": "ffcea889-34ef-40de-acf2-28a6cf1bfcbf",
+      "name": "user check in DB?",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "Проверяем есть ли пользователь в DB"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔡 User confirmed Delete Playlist ✔️\nPlaylist Deleted\n\nPlaylist name: {{ $('Delete Playlist').item.json.name }}"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2960,
+        304
+      ],
+      "id": "374f2015-3695-4728-ad7d-be8007778146",
+      "name": "Send message about playlist delete to topic",
+      "notes": "Отправка сообщения пользователя в топик"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    chat_id: $json.chat_id,\n    text: $json.text,\n    parse_mode: $json.parse_mode,\n    reply_markup: {\n      inline_keyboard: $json.inline_keyboard\n    }\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1968,
+        -896
+      ],
+      "id": "5936ca25-06ca-47d8-9364-680dbc1fa5c3",
+      "name": "Send message edit playlist",
+      "notes": "Отправка сообщения пользователя в топик"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Parse /edit command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse /edit command": {
+      "main": [
+        [
+          {
+            "node": "Check user in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check user in DB": {
+      "main": [
+        [
+          {
+            "node": "User banned?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User banned?": {
+      "main": [
+        [
+          {
+            "node": "Send banned message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Admin mode active?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Admin mode active?": {
+      "main": [
+        [
+          {
+            "node": "Send admin mode message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get user playlists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get user playlists": {
+      "main": [
+        [
+          {
+            "node": "More then 0?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send banned message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about banned user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send admin mode message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about MyPlaylists button",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "More then 0?": {
+      "main": [
+        [
+          {
+            "node": "Parse Playlist View Callback edit",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send no playlists message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Edit": {
+      "main": [
+        [
+          {
+            "node": "Edit Playlists Buttons",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Playlist Details",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Playlist rename timer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Playlist",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SQL Get Users playlists",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Confirm Type",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "is user DB?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Show Track For Deletion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send message edit playlists": {
+      "main": [
+        [
+          {
+            "node": "user in DB check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Playlists Buttons": {
+      "main": [
+        [
+          {
+            "node": "send message edit playlists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Playlist Edit Actions": {
+      "main": [
+        [
+          {
+            "node": "Send message edit playlist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Playlist Details": {
+      "main": [
+        [
+          {
+            "node": "Format Playlist Edit Actions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Playlist rename timer": {
+      "main": [
+        [
+          {
+            "node": "send message edit playlists name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send message edit playlists name": {
+      "main": [
+        [
+          {
+            "node": "user in DB?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message Craft": {
+      "main": [
+        [
+          {
+            "node": "send message delete playlist?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send message delete playlist?": {
+      "main": [
+        [
+          {
+            "node": "user DB checking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Передаем инфо/сообщение пользователя в группу поддержки38": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing54",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send message delete confirm": {
+      "main": [
+        [
+          {
+            "node": "delete message cause action delete playlist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Playlist ?2": {
+      "main": [
+        [
+          {
+            "node": "No playlists found for tracks send all1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Playlist Tracks2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Передаем инфо/сообщение пользователя в группу поддержки43": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing58",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "user есть в DB?52": {
+      "main": [
+        [
+          {
+            "node": "Передаем инфо/сообщение пользователя в группу поддержки43",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Передаем инфо/сообщение пользователя в группу поддержки45": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing59",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "user есть в DB?53": {
+      "main": [
+        [
+          {
+            "node": "Передаем инфо/сообщение пользователя в группу поддержки45",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Playlist Tracks2": {
+      "main": [
+        [
+          {
+            "node": "Format Playlist Tracks (First 10)2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Playlist Tracks (First 10)2": {
+      "main": [
+        [
+          {
+            "node": "Send message to topic about user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Show Track For Deletion": {
+      "main": [
+        [
+          {
+            "node": "Prepare Audio with Delete Buttons",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Audio with Delete Buttons": {
+      "main": [
+        [
+          {
+            "node": "Send Audio with Delete Buttons",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Audio with Delete Buttons": {
+      "main": [
+        [
+          {
+            "node": "user есть в DB?54",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Передаем инфо/сообщение пользователя в группу поддержки46": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing60",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "user есть в DB?54": {
+      "main": [
+        [
+          {
+            "node": "Передаем инфо/сообщение пользователя в группу поддержки46",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Confirm Type": {
+      "main": [
+        [
+          {
+            "node": "Switch Confirm Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Confirm Type": {
+      "main": [
+        [
+          {
+            "node": "Delete Track From Playlist",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Delete Playlist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Track From Playlist": {
+      "main": [
+        [
+          {
+            "node": "Send Track Delete Success Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Track Delete Success Message": {
+      "main": [
+        [
+          {
+            "node": "send message delete confirm1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send message delete confirm1": {
+      "main": [
+        [
+          {
+            "node": "user есть в DB?55",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Передаем инфо/сообщение пользователя в группу поддержки47": {
+      "main": [
+        [
+          {
+            "node": "delete message cause action delete track",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "user есть в DB?55": {
+      "main": [
+        [
+          {
+            "node": "Передаем инфо/сообщение пользователя в группу поддержки47",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Playlist": {
+      "main": [
+        [
+          {
+            "node": "send message delete confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send no playlists message": {
+      "main": [
+        [
+          {
+            "node": "Check user in DB now",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Playlist View Callback edit": {
+      "main": [
+        [
+          {
+            "node": "Switch Edit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "user in DB check": {
+      "main": [
+        [
+          {
+            "node": "Send Message to admin topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Message to admin topic": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing48",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "user is DB check for edit playlist": {
+      "main": [
+        [
+          {
+            "node": "Send message to topic group",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message to topic group": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing51",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "user in DB?": {
+      "main": [
+        [
+          {
+            "node": "Send message to admin topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message to admin topic": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing53",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Playlist": {
+      "main": [
+        [
+          {
+            "node": "Message Craft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SQL Get Users playlists": {
+      "main": [
+        [
+          {
+            "node": "No Playlist ?2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message to admin topic group": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing49",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check user in DB now": {
+      "main": [
+        [
+          {
+            "node": "Send message to admin topic group",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear user state": {
+      "main": [
+        [
+          {
+            "node": "delete message cause action canceled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "is user DB?": {
+      "main": [
+        [
+          {
+            "node": "Code for cancel state",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message to admin topic1": {
+      "main": [
+        [
+          {
+            "node": "Clear user state",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "user DB checking": {
+      "main": [
+        [
+          {
+            "node": "Передаем инфо/сообщение пользователя в группу поддержки38",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code for cancel state": {
+      "main": [
+        [
+          {
+            "node": "Send cancel message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "delete message cause action canceled": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send cancel message": {
+      "main": [
+        [
+          {
+            "node": "Send message to admin topic1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message to topic about user": {
+      "main": [
+        [
+          {
+            "node": "user есть в DB?53",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No playlists found for tracks send all1": {
+      "main": [
+        [
+          {
+            "node": "user есть в DB?52",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "delete message cause action delete track": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing61",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "delete message cause action delete playlist": {
+      "main": [
+        [
+          {
+            "node": "user check in DB?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "user check in DB?": {
+      "main": [
+        [
+          {
+            "node": "Send message about playlist delete to topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message about playlist delete to topic": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing55",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message edit playlist": {
+      "main": [
+        [
+          {
+            "node": "user is DB check for edit playlist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e9eafeff-d0cb-4817-b57d-0bb717355f5b",
+  "meta": {
+    "instanceId": "148b2b278c24b3c49bc4399db7e7ce15ed94f5b1044d28401c56f6ab511f0347"
+  },
+  "id": "aNcCAxgnbNXYuLXq",
+  "tags": []
+}

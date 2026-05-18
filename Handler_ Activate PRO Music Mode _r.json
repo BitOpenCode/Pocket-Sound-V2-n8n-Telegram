@@ -1,0 +1,572 @@
+{
+  "name": "Handler: Activate PRO Music Mode /r",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -448,
+        352
+      ],
+      "id": "906ada82-c78d-454f-aa4f-c8aac234e0de",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body;\nconst callback = body.callback_query;\nconst message = callback.message;\nconst chatId = message.chat.id;\nconst messageId = message.message_id;\nconst from = callback.from;\nconst username = from.username || null;\nconst firstName = from.first_name || '';\nconst lastName = from.last_name || '';\nconst isPremium = from.is_premium || false;\nconst languageCode = from.language_code || 'en';\nconst callbackData = callback.data || '';\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    message_id: messageId,\n    username: username,\n    first_name: firstName,\n    last_name: lastName,\n    is_premium: isPremium,\n    language_code: languageCode,\n    callback_data: callbackData\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        352
+      ],
+      "id": "6916e7b9-b89d-4583-95f8-299a6946477a",
+      "name": "Parse activate callback"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.chat_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        352
+      ],
+      "id": "c41d10ec-3172-4b01-a412-be0e58fbbd85",
+      "name": "Check user in DB",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "banned",
+              "leftValue": "={{ $json.is_banned }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        352
+      ],
+      "id": "d21bc754-6cab-44eb-b161-eab8734752ea",
+      "name": "User banned?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "admin",
+              "leftValue": "={{ $json.admin_active }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        432,
+        368
+      ],
+      "id": "d89d24b7-8f57-45c2-afb5-fde707b436e4",
+      "name": "Admin mode active?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=⛔️ You are banned from using this bot.\n\nContact support: @PocketSound_bot\n\n/support\n\n@PocketSound_bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        192
+      ],
+      "id": "c18d26aa-fe95-4686-a47e-b84b861e4171",
+      "name": "Send banned message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=❄️ Admin mode is active. You cannot change API mode.\n\n@PocketSound_bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        432,
+        192
+      ],
+      "id": "85a16716-dc34-4deb-b545-ac204bf32434",
+      "name": "Send admin mode message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=⛔️ BANNED USER pressed /soundsearch\n\nUser: @{{ $json.username }}\nTG ID: {{ $json.chat_id }}\n\nTo unban: /admin_false {{ $json.chat_id }}"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        32
+      ],
+      "id": "013f7fc8-3db8-42d5-b1fa-18c0bb2ddfda",
+      "name": "Notify admin about banned user"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔄 User pressed /soundsearch (Admin mode ACTIVE)\n\nUser: @{{ $json.username }}\nTG ID: {{ $json.chat_id }}\n\n❄️ Admin dialog is active. User cannot change API mode."
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        432,
+        32
+      ],
+      "id": "96a4ef97-a3aa-4784-8471-7a3a4dc223f9",
+      "name": "Notify admin about admin mode"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1696,
+        384
+      ],
+      "id": "4ebccc71-e2c3-4ec4-bc6d-761aa119585b",
+      "name": "Done"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE pocketsound_users \nSET \n  music_api_mode = TRUE,\n  updated_at = CURRENT_TIMESTAMP\nWHERE tg_id = {{ $('Parse activate callback').item.json.chat_id }};",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        880,
+        384
+      ],
+      "id": "b2a67321-d197-4388-8cce-3fabb00bbd58",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/deleteMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.tg_id }}"
+            },
+            {
+              "name": "message_id",
+              "value": "={{ $('When Executed by Another Workflow').item.json.body.callback_query.message.message_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        672,
+        384
+      ],
+      "id": "d797b169-17c4-46fe-99bf-c963a3891eb4",
+      "name": "Delete original message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔎 User ACTIVATED API MODE\n📡 📡 📡 📡 📡\nid: {{ $('Check user in DB').first().json.id }}\ntg_id: {{ $('Check user in DB').first().json.tg_id }}\nUsername: {{ $('Check user in DB').first().json.tg_username }}\nName: {{ $('Check user in DB').first().json.tg_first_name }}\n📡 📡 📡 📡 📡\nStatus API: {{ $('Check user in DB').first().json.music_api_mode }}\n🔎 🔎 🔎 🔎 🔎"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $('Check user in DB').first().json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1088,
+        384
+      ],
+      "id": "f7549a9a-c845-4e39-bbc7-5bb8ab2752b2",
+      "name": "Notify admin about activation"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Check user in DB').item.json.tg_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=✅ Pro Mode Activated\n💎 💎 💎\nNow you can search almost any music files using extended Deezer API. Unlimited tracks, full catalog.\n\nEnjoy the ultimate music search!\n\n@PocketSound_bot"
+            },
+            {
+              "name": "reply_markup",
+              "value": "{\"inline_keyboard\":[[{\"text\":\"🎵 Sound Search\",\"callback_data\":\"/soundsearch\"}]]}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1296,
+        384
+      ],
+      "id": "e474a752-9d2c-4a71-9d0e-0756616453a7",
+      "name": "Send message to user about Mode switch"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔎 User ACTIVATED API MODE USING Pro Mode\n💎 💎 💎\nMessage from bot to user:\n{{ $json.result.text }}\n💎 💎 💎\nUser also see button to Mode Switch \"Sound Search\"\n🔎 🔎 🔎 🔎 🔎\nStatus API: {{ $('Check user in DB').first().json.music_api_mode }}\n🔎 🔎 🔎 🔎 🔎"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $('Check user in DB').first().json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1504,
+        384
+      ],
+      "id": "4ceb7f35-5514-414c-a200-577c2b8ddda0",
+      "name": "Notify admin about bot message"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Parse activate callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse activate callback": {
+      "main": [
+        [
+          {
+            "node": "Check user in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check user in DB": {
+      "main": [
+        [
+          {
+            "node": "User banned?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User banned?": {
+      "main": [
+        [
+          {
+            "node": "Send banned message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Admin mode active?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Admin mode active?": {
+      "main": [
+        [
+          {
+            "node": "Send admin mode message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Delete original message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send banned message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about banned user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send admin mode message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about admin mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete original message": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about activation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify admin about activation": {
+      "main": [
+        [
+          {
+            "node": "Send message to user about Mode switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message to user about Mode switch": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about bot message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify admin about bot message": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e3bf1f29-4719-4a5f-9bd2-a241a6bc01c7",
+  "meta": {
+    "instanceId": "148b2b278c24b3c49bc4399db7e7ce15ed94f5b1044d28401c56f6ab511f0347"
+  },
+  "id": "4I2dvRMn1pELNIhr",
+  "tags": []
+}

@@ -1,0 +1,568 @@
+{
+  "name": "Handler: dzmore_results /r",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -832,
+        112
+      ],
+      "id": "3c26f154-9147-4cf3-b278-efb2a12f2464",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body;\nconst callback = body.callback_query;\nconst message = callback.message;\nconst chatId = message.chat.id;\nconst messageId = message.message_id;\nconst from = callback.from;\nconst username = from.username || null;\nconst firstName = from.first_name || '';\nconst lastName = from.last_name || '';\nconst isPremium = from.is_premium || false;\nconst languageCode = from.language_code || 'en';\nconst callbackData = callback.data || '';\n\nconst parts = callbackData.split('|');\nconst action = parts[0];\nconst query = parts[1] || '';\nconst offsetRaw = parts[2] || '0';\nconst offset = parseInt(offsetRaw, 10);\n\nif (action !== 'dzmore') {\n  throw new Error('Invalid callback data for dzmore_results');\n}\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    message_id: messageId,\n    username: username,\n    first_name: firstName,\n    last_name: lastName,\n    is_premium: isPremium,\n    language_code: languageCode,\n    callback_data: callbackData,\n    query: query,\n    offset: offset\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -608,
+        112
+      ],
+      "id": "54de650d-2790-43e9-8dd6-eda8c6a630f9",
+      "name": "Parse dzmore callback"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.chat_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -384,
+        112
+      ],
+      "id": "f3a944af-7367-40e1-b0f0-4dede3b69d0e",
+      "name": "Check User in DB",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-banned",
+              "leftValue": "={{ $json.is_banned }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -160,
+        112
+      ],
+      "id": "645b2955-5009-4a84-9a8f-4a257adc8214",
+      "name": "User banned?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-admin",
+              "leftValue": "={{ $json.admin_active }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        48,
+        128
+      ],
+      "id": "0117c0b6-aa04-45cd-8d83-fca1029af719",
+      "name": "Admin mode active?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=⛔️ You are banned from using this bot.\n\nContact support: @PocketSound_bot\n\n/support\n\n@PocketSound_bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -160,
+        -80
+      ],
+      "id": "f804c457-ef73-43a1-a729-9ef010db5d12",
+      "name": "Send banned message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=❄️ Admin mode is active. You cannot use the bot.\n\n@PocketSound_bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        48,
+        -80
+      ],
+      "id": "95397c90-750a-4936-9524-1b9f43e530a1",
+      "name": "Send admin mode message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=⛔️ BANNED USER PRESSED BUTTON ⛔️\n\nUser: @{{ $('Parse dzmore callback').item.json.username }}\nTG ID: {{ $('Parse dzmore callback').item.json.chat_id }}\nButton: {{ $('Parse dzmore callback').item.json.callback_data }}\n\nTo unban: /admin_false {{ $('Parse dzmore callback').item.json.chat_id }}"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -160,
+        -256
+      ],
+      "id": "638de5de-a942-40af-a91c-2bf3b28bbbea",
+      "name": "Notify admin about banned user"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔄 User pressed button (Admin mode ACTIVE)\n\nUser: @{{ $('Parse dzmore callback').item.json.username }}\nTG ID: {{ $('Parse dzmore callback').item.json.chat_id }}\nButton: {{ $('Parse dzmore callback').item.json.callback_data }}\n\n❄️ Admin dialog is active. User cannot interact."
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        48,
+        -256
+      ],
+      "id": "104b072b-868f-4e11-aa2d-7fc804a18e6d",
+      "name": "Notify admin about admin mode"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.deezer.com/search?q={{ $json.query }}&index={{ $json.offset }}&limit=9",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        432,
+        144
+      ],
+      "id": "d70ebc0c-0973-432c-9d1f-47fb0da0e6f8",
+      "name": "Deezer Search"
+    },
+    {
+      "parameters": {
+        "jsCode": "const deezerData = $input.first().json;\nconst tracks = deezerData.data || [];\nconst total = deezerData.total || 0;\n\nif (!tracks || tracks.length === 0) {\n  const chatId = $('Parse dzmore callback').item.json.chat_id;\n  const replyToMessageId = $('Parse dzmore callback').item.json.message_id;\n  const query = $('Parse dzmore callback').item.json.query;\n  \n  return [{\n    json: {\n      chat_id: chatId,\n      reply_to_message_id: replyToMessageId,\n      text: `❌ Nothing found: <b>${query}</b>\\n\\n💡 Try:\\n• Artist name only\\n• Song title only\\n• Different spelling`,\n      parse_mode: 'HTML',\n      send_as_text: true \n    }\n  }];\n}\n\nconst chatId = $('Parse dzmore callback').item.json.chat_id;\nconst replyToMessageId = $('Parse dzmore callback').item.json.message_id;\nconst query = $('Parse dzmore callback').item.json.query;\nconst offset = $('Parse dzmore callback').item.json.offset;\n\nconst photo = tracks[0]?.album?.cover_big\n  || tracks[0]?.album?.cover_medium\n  || '';\n\nconst inline_keyboard = tracks.map(track => ([\n  {\n    text: `🎵 ${track.title} — ${track.artist.name}`,\n    callback_data: `dz|${track.id}`\n  }\n]));\n\n// Кнопка More на основе РЕАЛЬНОГО количества полученных треков\nif (offset + tracks.length < total) {\n  let moreText = 'More…';\n  \n  // Показываем цифры только если получено достаточно треков (5+)\n  if (tracks.length >= 5) {\n    moreText = `More… (${offset + tracks.length}/${total})`;\n  }\n  \n  inline_keyboard.push([\n    {\n      text: moreText,\n      callback_data: `dzmore|${query}|${offset + tracks.length}`\n    }\n  ]);\n}\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    reply_to_message_id: replyToMessageId,\n    photo: photo,\n    caption: `🔍 Результаты по запросу: <b>${query}</b>`,\n    parse_mode: 'HTML',\n    reply_markup: { inline_keyboard }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        144
+      ],
+      "id": "19c29d12-d7d4-4e33-a50a-8e395f50b476",
+      "name": "Build keyboard"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": {{ $json.chat_id }},\n  \"reply_to_message_id\": {{ $json.reply_to_message_id }},\n  \"text\": \"Music:\",\n  \"reply_markup\": {{ JSON.stringify($json.reply_markup) }}\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        848,
+        144
+      ],
+      "id": "28dab235-c4bb-4365-b13a-ba6051c8a716",
+      "name": "Send results to user"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.result.chat.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1072,
+        144
+      ],
+      "id": "9e3aba1a-4dbe-4e80-adf0-3cf0267cb0bf",
+      "name": "Get user for notify",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔎 User found MORE songs through API MODE!\n\nUser ID: {{ $json.id }}\nTG ID: {{ $json.tg_id }}\nUsername: @{{ $json.tg_username }}\nQuery: {{ $('Parse dzmore callback').item.json.query }}\nOffset: {{ $('Parse dzmore callback').item.json.offset }}\n\nResults sent."
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1296,
+        144
+      ],
+      "id": "62630c48-b5ff-4f24-957c-f7ea32dcbb7e",
+      "name": "Notify admin about results"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1520,
+        144
+      ],
+      "id": "8487982f-278b-4f64-9ee2-d8131b8394da",
+      "name": "Done"
+    },
+    {
+      "parameters": {
+        "jsCode": "const callbackData = $('Parse dzmore callback').item.json.callback_data;\nconst parts = callbackData.split('|');\nlet query = parts[1] || '';\n\nquery = query\n  .replace(/[^\\w\\s\\u0400-\\u04FF-]/gi, ' ')\n  .replace(/\\s+/g, ' ')\n  .trim();\n\nconst offset = parts[2] || '0';\n\nreturn [{\n  json: {\n    query: query,\n    offset: Number(offset)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        144
+      ],
+      "id": "7232fa0b-54db-4327-bbb4-c1c0452fb5f4",
+      "name": "Deezer  Norm text"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Parse dzmore callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse dzmore callback": {
+      "main": [
+        [
+          {
+            "node": "Check User in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check User in DB": {
+      "main": [
+        [
+          {
+            "node": "User banned?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User banned?": {
+      "main": [
+        [
+          {
+            "node": "Send banned message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Admin mode active?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Admin mode active?": {
+      "main": [
+        [
+          {
+            "node": "Send admin mode message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Deezer  Norm text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send banned message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about banned user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send admin mode message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about admin mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deezer Search": {
+      "main": [
+        [
+          {
+            "node": "Build keyboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build keyboard": {
+      "main": [
+        [
+          {
+            "node": "Send results to user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send results to user": {
+      "main": [
+        [
+          {
+            "node": "Get user for notify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get user for notify": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify admin about results": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deezer  Norm text": {
+      "main": [
+        [
+          {
+            "node": "Deezer Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1750409e-3b81-4a8d-b701-f366c8f47407",
+  "meta": {
+    "instanceId": "148b2b278c24b3c49bc4399db7e7ce15ed94f5b1044d28401c56f6ab511f0347"
+  },
+  "id": "YVJe4FAUGdCrK4FA",
+  "tags": []
+}

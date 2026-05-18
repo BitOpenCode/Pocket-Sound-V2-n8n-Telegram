@@ -1,0 +1,532 @@
+{
+  "name": "Handler: audio /r",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -464,
+        -144
+      ],
+      "id": "03983c3d-6ea3-489a-b52e-59e5e766360e",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body;\nconst message = body.message;\n\nif (!message || !message.audio) {\n  throw new Error('No audio message found');\n}\n\nreturn [{\n  json: {\n    chat_id: message.chat.id,\n    message_id: message.message_id,\n\n    username: message.chat.username || null,\n    first_name: message.chat.first_name || '',\n    last_name: message.chat.last_name || '',\n\n    is_premium: message.from?.is_premium || false,\n    language_code: message.from?.language_code || 'en',\n\n    audio: {\n      file_id: message.audio.file_id,\n      file_unique_id: message.audio.file_unique_id,\n      file_name: message.audio.file_name || '',\n      mime_type: message.audio.mime_type || 'audio/mpeg',\n      title: message.audio.title || '',\n      performer: message.audio.performer || '',\n      duration: message.audio.duration || 0,\n      file_size: message.audio.file_size || 0,\n      thumbnail_file_id: message.audio.thumbnail?.file_id || ''\n    },\n\n    raw_body: body\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        -144
+      ],
+      "id": "2f5b3763-572f-40a2-a203-592159f6fe56",
+      "name": "Parse Incoming Audio"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.chat_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -16,
+        -144
+      ],
+      "id": "2fc29200-beb5-442e-b92e-8ba5c4fdbf5e",
+      "name": "Check user in DB",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-banned",
+              "leftValue": "={{ $json.is_banned }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        208,
+        -144
+      ],
+      "id": "7364b582-3532-4423-8266-d66b447a2210",
+      "name": "User banned?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Parse Incoming Audio').item.json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=⛔️ You are banned from using this bot."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        208,
+        -304
+      ],
+      "id": "e3e02e37-476d-4389-829a-220b5590a04e",
+      "name": "Send banned message"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO pocketsound_tg_chats (tg_chat_id, chat_type, title, username)\nVALUES (\n  {{ $('Parse Incoming Audio').item.json.chat_id }},\n  'private',\n  '{{ $('Parse Incoming Audio').item.json.first_name }}',\n  '{{ $('Parse Incoming Audio').item.json.username }}'\n)\nON CONFLICT (tg_chat_id) DO NOTHING;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        656,
+        -112
+      ],
+      "id": "c0f1fce2-99e7-4321-946d-5196e101724d",
+      "name": "Insert TG Chat",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO pocketsound_files (\n  owner_user_id,\n  tg_chat_id,\n  message_id,\n  file_unique_id,\n  title,\n  artist,\n  file_name,\n  duration,\n  file_size,\n  mime_type,\n  file_type,\n  thumbnail_file_id,\n  uploaded_at,\n  created_at\n)\nVALUES (\n  {{ $('Check user in DB').item.json.id }},\n  {{ $('Parse Incoming Audio').item.json.chat_id }},\n  {{ $('Parse Incoming Audio').item.json.message_id }},\n  '{{ $('Parse Incoming Audio').item.json.audio.file_unique_id }}',\n  '{{ $('Parse Incoming Audio').item.json.audio.title }}',\n  '{{ $('Parse Incoming Audio').item.json.audio.performer }}',\n  '{{ $('Parse Incoming Audio').item.json.audio.file_name }}',\n  {{ $('Parse Incoming Audio').item.json.audio.duration }},\n  {{ $('Parse Incoming Audio').item.json.audio.file_size }},\n  '{{ $('Parse Incoming Audio').item.json.audio.mime_type }}',\n  'audio',\n  '{{ $('Parse Incoming Audio').item.json.audio.thumbnail_file_id }}',\n  NOW(),\n  NOW()\n)\nON CONFLICT (file_unique_id) DO NOTHING;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        880,
+        -112
+      ],
+      "id": "5012bbe1-d7cc-4acf-9483-f93c89b719de",
+      "name": "Insert Audio File",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, title, artist, file_name\nFROM pocketsound_files\nWHERE file_unique_id = '{{ $('Parse Incoming Audio').item.json.audio.file_unique_id }}'\nLIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1104,
+        -112
+      ],
+      "id": "23127c42-0066-4a22-89f2-f2e61b2ac7b5",
+      "name": "Get File ID",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO pocketsound_file_search_index (\n  file_id,\n  search_text,\n  normalized_text\n)\nVALUES (\n  {{ $json.id }},\n  '{{ $json.title }} {{ $json.artist }} {{ $json.file_name }}',\n  to_tsvector(\n    'simple',\n    LOWER('{{ $json.title }} {{ $json.artist }} {{ $json.file_name }}')\n  )\n)\nON CONFLICT (file_id) DO UPDATE\nSET\n  search_text = EXCLUDED.search_text,\n  normalized_text = EXCLUDED.normalized_text;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1328,
+        -112
+      ],
+      "id": "410375d9-6aa7-4f9b-b2b3-b6d0ed5701a4",
+      "name": "Update Search Index",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/copyMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $('Parse Incoming Audio').item.json.chat_id }}\",\n  \"from_chat_id\": \"{{ $('Parse Incoming Audio').item.json.chat_id }}\",\n  \"message_id\": \"{{ $('Parse Incoming Audio').item.json.message_id }}\",\n  \"caption\": \"Audio saved in Telegram! You can now add this track to Playlist.\\n\\n@PocketSound_bot\",\n  \"reply_markup\": {\n    \"inline_keyboard\": [\n      [\n        {\n          \"text\": \"➕ Add to Playlist\",\n          \"callback_data\": \"add_to_playlist|{{ $('Get File ID').first().json.id }}\"\n        }\n      ]\n    ]\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1552,
+        -112
+      ],
+      "id": "ab7de89e-c35e-42af-91fd-a6085085718a",
+      "name": "Send Audio Back To User"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2208,
+        -112
+      ],
+      "id": "d7cbc299-c097-4c66-b2aa-e203bcf3d707",
+      "name": "Done"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=❄️ Активен режим админа ❄️\nПользователю не сможет воспользоваться кнопкой Back\n\nКлиент @{{ $('Telegram Start').item.json.callback_query.message.chat.username }}\n\n\nДанные пользователя из Telegram: \n\nИмя: {{ $('Telegram Start').item.json.callback_query.message.chat.first_name }}\nTG Premium: {{ $('Telegram Start').item.json.callback_query.from.is_premium }}\n\nЭто бот? {{ $('Telegram Start').item.json.callback_query.from.is_bot }}\nTGid: {{ $('Telegram Start').item.json.callback_query.message.chat.id }}\n\n❄️❄️❄️❄️\nАдминистратор вводил команду по пользователю: (слэш) admin_true (tgid пользователя)\nВ Postgres статус {{ $('Check3').item.json.admin_active }}\nadmin_active TRUE\n❄️❄️❄️❄️\n\nЧтобы активировать workflow Клиента (слэш) admin_false (TGid) - все кнопки станут доступны."
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $('Check3').item.json.topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        432,
+        -304
+      ],
+      "id": "74cc5c5b-3b5f-4f8c-befc-684a490b0c9a",
+      "name": "Send message to admin about user",
+      "notes": "Отправка текстового сообщения пользователя в топик"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=User Sent AUDIO file 💿 💿 💿\nUsername: {{ $('Parse Incoming Audio').item.json.username }}\ntg_id: {{ $('Parse Incoming Audio').item.json.chat_id }}\n\nFile INFO\nName: {{ $('Parse Incoming Audio').item.json.audio.file_name }}\nTitle: {{ $('Parse Incoming Audio').item.json.audio.title }}\nArtist: {{ $('Parse Incoming Audio').item.json.audio.performer }}\nDuration: {{ $('Parse Incoming Audio').item.json.audio.duration }} sec\nSize: {{ $('Parse Incoming Audio').item.json.audio.file_size }} bytes\n\n💿 💿 💿 💿 💿"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $('Check user in DB').item.json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1776,
+        -112
+      ],
+      "id": "7a3223ed-2ab8-4297-ad60-92a6e0e80394",
+      "name": "Send message to admin about user song",
+      "notes": "Отправка сообщения пользователя в топик"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/copyMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"-1003381734836\",\n  \"from_chat_id\": \"{{ $('Parse Incoming Audio').item.json.chat_id }}\",\n  \"message_id\": \"{{ $('Parse Incoming Audio').item.json.message_id }}\",\n  \"message_thread_id\": \"{{ $('Check user in DB').item.json.support_topic_id }}\",\n  \"caption\": \"🎵 User uploaded audio\\n\\nUser: @{{ $('Parse Incoming Audio').item.json.username }}\\nTG ID: {{ $('Parse Incoming Audio').item.json.chat_id }}\\nFile: {{ $('Parse Incoming Audio').item.json.audio.file_name }}\\nTitle: {{ $('Parse Incoming Audio').item.json.audio.title }}\\nArtist: {{ $('Parse Incoming Audio').item.json.audio.performer }}\\nDuration: {{ $('Parse Incoming Audio').item.json.audio.duration }} sec\\n\\n@PocketSound_bot\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        -112
+      ],
+      "id": "928d2e30-2304-47ed-be97-67b464316f51",
+      "name": "Send confirmation message with bot context",
+      "notes": "Отправка сообщения пользователя в топик"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b18c7445-8d2d-4684-8e66-3b5b2913db4b",
+              "leftValue": "={{ $json.admin_active }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        432,
+        -128
+      ],
+      "id": "36637f94-03f8-4ff2-9fad-d8493920a23d",
+      "name": "IF: admin_dialog_active = TRUE?"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Parse Incoming Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Incoming Audio": {
+      "main": [
+        [
+          {
+            "node": "Check user in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check user in DB": {
+      "main": [
+        [
+          {
+            "node": "User banned?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User banned?": {
+      "main": [
+        [
+          {
+            "node": "Send banned message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF: admin_dialog_active = TRUE?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert TG Chat": {
+      "main": [
+        [
+          {
+            "node": "Insert Audio File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Audio File": {
+      "main": [
+        [
+          {
+            "node": "Get File ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get File ID": {
+      "main": [
+        [
+          {
+            "node": "Update Search Index",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Search Index": {
+      "main": [
+        [
+          {
+            "node": "Send Audio Back To User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Audio Back To User": {
+      "main": [
+        [
+          {
+            "node": "Send message to admin about user song",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message to admin about user song": {
+      "main": [
+        [
+          {
+            "node": "Send confirmation message with bot context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send confirmation message with bot context": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: admin_dialog_active = TRUE?": {
+      "main": [
+        [
+          {
+            "node": "Send message to admin about user",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Insert TG Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2321a4f1-630e-43b7-9146-01a46efccf28",
+  "meta": {
+    "instanceId": "148b2b278c24b3c49bc4399db7e7ce15ed94f5b1044d28401c56f6ab511f0347"
+  },
+  "id": "TKCPs4BfCYSYzi7z",
+  "tags": []
+}

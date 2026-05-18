@@ -1,0 +1,609 @@
+{
+  "name": "Handler: View Playlist /r",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -800,
+        256
+      ],
+      "id": "ebbbde4d-eab4-401f-90a5-14b85aaf6555",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body;\nconst callback = body.callback_query;\nconst message = callback.message;\nconst chatId = message.chat.id;\nconst messageId = message.message_id;\nconst from = callback.from;\nconst username = from.username || null;\nconst firstName = from.first_name || '';\nconst lastName = from.last_name || '';\nconst isPremium = from.is_premium || false;\nconst languageCode = from.language_code || 'en';\nconst callbackData = callback.data || '';\nconst parts = callbackData.split('|');\nconst playlistId = parts[1] ? Number(parts[1]) : null;\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    message_id: messageId,\n    username: username,\n    first_name: firstName,\n    last_name: lastName,\n    is_premium: isPremium,\n    language_code: languageCode,\n    playlist_id: playlistId,\n    callback_data: callbackData\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -576,
+        256
+      ],
+      "id": "3d95ac9c-7ee3-4bbf-a351-584bbd1cd77a",
+      "name": "Parse playlist_view callback"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.chat_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -352,
+        256
+      ],
+      "id": "cacaf5f3-195b-44ae-a349-da9e06e0ad53",
+      "name": "Check user in DB",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "banned",
+              "leftValue": "={{ $json.is_banned }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -128,
+        256
+      ],
+      "id": "dfbccd23-a582-4457-ae8a-2488077ed1f0",
+      "name": "User banned?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "admin",
+              "leftValue": "={{ $json.admin_active }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        80,
+        272
+      ],
+      "id": "f83fcccb-13c7-4ff1-b6cc-2b4a02fce4e2",
+      "name": "Admin mode active?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "⛔️ You are banned from using this bot.\n\nContact support: @PocketSoundbot\n\n@PocketSoundbot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -128,
+        96
+      ],
+      "id": "a69d955b-cd05-4717-9269-629da7c82002",
+      "name": "Send banned message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "❄️ Admin mode is active. You cannot view playlists.\n\n@PocketSoundbot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        80,
+        96
+      ],
+      "id": "2460f58c-17e0-46b1-9ddf-51c31c420ab2",
+      "name": "Send admin mode message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "⛔️ BANNED USER pressed Playlist button\n\nUser: @{{ $('Parse playlist_view callback').item.json.username }}\nTG ID: {{ $('Parse playlist_view callback').item.json.chat_id }}\nTo unban: /admin_false {{ $('Parse playlist_view callback').item.json.chat_id }}"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -128,
+        -64
+      ],
+      "id": "0266eddb-6cc5-4921-8205-734d537381a5",
+      "name": "Notify admin about banned user"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "🔄 User pressed Playlist button (Admin mode ACTIVE)\n\nUser: @{{ $('Parse playlist_view callback').item.json.username }}\nTG ID: {{ $('Parse playlist_view callback').item.json.chat_id }}\n❄️ Admin dialog is active. User cannot view playlists."
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        80,
+        -64
+      ],
+      "id": "69c717d1-eda1-43df-85b3-9415f9c32144",
+      "name": "Notify admin about admin mode"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT name FROM pocketsound_playlists WHERE id = {{ $json.playlist_id }} AND user_id = {{ $('Check user in DB').first().json.id }} LIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        496,
+        288
+      ],
+      "id": "c08231cf-1c12-4cf5-8a13-6f1a8ee59fd2",
+      "name": "Get playlist name",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT f.id, f.title, f.artist, f.tg_chat_id, f.message_id, pt.position FROM pocketsound_playlist_tracks pt JOIN pocketsound_files f ON f.id = pt.file_id WHERE pt.playlist_id = {{ $('Parse playlist_view callback').first().json.playlist_id }} ORDER BY pt.position ASC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        704,
+        288
+      ],
+      "id": "9b5cea87-b922-4ada-a19b-e4eb308dce06",
+      "name": "Get playlist tracks",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const tracks = $input.all();\nconst playlistName = $('Get playlist name').first().json.name;\nconst playlistId = $('Parse playlist_view callback').first().json.playlist_id;\nconst totalTracks = tracks.length;\nconst chatId = $('Parse playlist_view callback').first().json.chat_id;\n\nif (totalTracks === 0) {\n  return [{\n    json: {\n      chat_id: chatId,\n      text: `📂 Playlist: <b>${playlistName}</b>\\n\\n❌ Your playlist is empty.\\n\\nSend any track to the bot or use search to find music.\\nAfter sending/searching, click \"➕ Add to Playlist\" button.\\n\\n@PocketSoundbot`,\n      parse_mode: 'HTML',\n      reply_markup: {\n        inline_keyboard: [\n          [{ text: '🔙 Back to Playlists', callback_data: '/myplaylist' }]\n        ]\n      }\n    }\n  }];\n}\n\nconst validTracks = [];\nfor (const item of tracks) {\n  const track = item.json;\n  if (track && track.id) {\n    const artist = track.artist && String(track.artist).trim() !== '' ? String(track.artist).trim() : 'Unknown artist';\n    const title = track.title && String(track.title).trim() !== '' ? String(track.title).trim() : 'Unknown title';\n    validTracks.push({\n      id: track.id,\n      artist: artist,\n      title: title\n    });\n  }\n}\n\nif (validTracks.length === 0) {\n  return [{\n    json: {\n      chat_id: chatId,\n      text: `📂 Playlist: <b>${playlistName}</b>\\n\\n❌ No tracks found in this playlist. Add tracks to your playlist.\\n\\n@PocketSoundbot`,\n      parse_mode: 'HTML',\n      reply_markup: {\n        inline_keyboard: [\n          [{ text: '🔙 Back to Playlists', callback_data: '/myplaylist' }]\n        ]\n      }\n    }\n  }];\n}\n\nconst firstTenTracks = validTracks.slice(0, 10);\nconst inline_keyboard = firstTenTracks.map(track => ([\n  {\n    text: `🎵 ${track.artist} - ${track.title}`,\n    callback_data: `get|${track.id}`\n  }\n]));\n\nif (totalTracks > 10) {\n  inline_keyboard.push([\n    {\n      text: `▶️ More… (10/${totalTracks})`,\n      callback_data: `playlist_more|${playlistId}|10`\n    }\n  ]);\n}\n\ninline_keyboard.push([\n  {\n    text: `📤 Send All Tracks (${totalTracks})`,\n    callback_data: `playlist_send_all|${playlistId}`\n  }\n]);\n\ninline_keyboard.push([\n  {\n    text: '✏️ Edit Playlist',\n    callback_data: `/edit|playlist|${playlistId}`\n  }\n]);\n\ninline_keyboard.push([\n  {\n    text: '🔙 Back to Playlists',\n    callback_data: '/myplaylist'\n  }\n]);\n\nconst messageText = `📂 Playlist: <b>${playlistName}</b>\\n🎵 Total tracks: ${totalTracks}\\n\\nClick on a track to play or send all at once!\\n\\n@PocketSound_bot`;\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    text: messageText,\n    parse_mode: 'HTML',\n    reply_markup: { inline_keyboard }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        288
+      ],
+      "id": "19d541c6-33bc-4c87-8dac-6daacb816ccd",
+      "name": "Format playlist view"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ \n  {\n    chat_id: $json.chat_id,\n    text: $json.text,\n    parse_mode: $json.parse_mode,\n    reply_markup: $json.reply_markup\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        288
+      ],
+      "id": "801b1451-c070-45aa-97be-c7fabd37fd97",
+      "name": "Send playlist to user"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $('Parse playlist_view callback').item.json.chat_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1344,
+        288
+      ],
+      "id": "ad44b038-9775-4094-852e-912eda4300b7",
+      "name": "Get user for notify",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔡 User opened Playlist\n\nPlaylist ID: {{ $('Parse playlist_view callback').item.json.playlist_id }}\nUser: @{{ $json.tg_username }}\nTG ID: {{ $json.tg_id }}\n\nBot message:\n{{ $('Send playlist to user').item.json.result.text }}\n"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1568,
+        288
+      ],
+      "id": "9e33b19e-91cc-4424-9230-ea138bbd6e5d",
+      "name": "Notify admin about view"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1792,
+        288
+      ],
+      "id": "5ce79f3e-2131-45cb-bfad-d21f8619d9d4",
+      "name": "Done"
+    },
+    {
+      "parameters": {
+        "jsCode": "const parseData = $('Parse playlist_view callback').first().json;\nconst userData = $('Check user in DB').first().json;\n\nreturn [{\n  json: {\n    chat_id: parseData.chat_id,\n    message_id: parseData.message_id,\n    playlist_id: parseData.playlist_id,\n    user_id: userData.id,\n    support_topic_id: userData.support_topic_id,\n    is_banned: userData.is_banned,\n    admin_active: userData.admin_active\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        288
+      ],
+      "id": "4a9ee1cd-aed5-45ad-980c-22c454ff5790",
+      "name": "Accum data"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Parse playlist_view callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse playlist_view callback": {
+      "main": [
+        [
+          {
+            "node": "Check user in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check user in DB": {
+      "main": [
+        [
+          {
+            "node": "User banned?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User banned?": {
+      "main": [
+        [
+          {
+            "node": "Send banned message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Admin mode active?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Admin mode active?": {
+      "main": [
+        [
+          {
+            "node": "Send admin mode message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Accum data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send banned message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about banned user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send admin mode message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about admin mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get playlist name": {
+      "main": [
+        [
+          {
+            "node": "Get playlist tracks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get playlist tracks": {
+      "main": [
+        [
+          {
+            "node": "Format playlist view",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format playlist view": {
+      "main": [
+        [
+          {
+            "node": "Send playlist to user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send playlist to user": {
+      "main": [
+        [
+          {
+            "node": "Get user for notify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get user for notify": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about view",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify admin about view": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Accum data": {
+      "main": [
+        [
+          {
+            "node": "Get playlist name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "a1334286-93af-4d81-ad86-2ff93cc402b8",
+  "meta": {
+    "instanceId": "148b2b278c24b3c49bc4399db7e7ce15ed94f5b1044d28401c56f6ab511f0347"
+  },
+  "id": "RQ3PWrZKDLuwqMqx",
+  "tags": []
+}

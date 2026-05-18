@@ -1,0 +1,725 @@
+{
+  "name": "Handler: Create Playlist /r",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -960,
+        272
+      ],
+      "id": "36907a16-3fcb-49f9-923c-e86a66427ab4",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body;\nlet chatId = null;\nlet messageId = null;\nlet username = null;\nlet firstName = null;\nlet lastName = null;\nlet isPremium = false;\nlet languageCode = 'en';\n\nif (body.callback_query) {\n  const callback = body.callback_query;\n  const message = callback.message;\n  chatId = message.chat.id;\n  messageId = message.message_id;\n  username = message.chat.username || null;\n  firstName = message.chat.first_name || '';\n  lastName = message.chat.last_name || '';\n  isPremium = callback.from?.is_premium || false;\n  languageCode = callback.from?.language_code || 'en';\n}\nelse if (body.message) {\n  const message = body.message;\n  chatId = message.chat.id;\n  messageId = message.message_id;\n  username = message.chat.username || null;\n  firstName = message.chat.first_name || '';\n  lastName = message.chat.last_name || '';\n  isPremium = message.from?.is_premium || false;\n  languageCode = message.from?.language_code || 'en';\n}\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    message_id: messageId,\n    username: username,\n    first_name: firstName,\n    last_name: lastName,\n    is_premium: isPremium,\n    language_code: languageCode\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -736,
+        272
+      ],
+      "id": "e1d4f3dd-81d5-4e35-b220-5951c0f5343a",
+      "name": "Parse Create command"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.chat_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -512,
+        272
+      ],
+      "id": "4ca2cce8-7b44-48a1-b490-9f065dfee2ce",
+      "name": "Check user in DB",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-banned",
+              "leftValue": "={{ $json.is_banned }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -288,
+        272
+      ],
+      "id": "7eeaa54d-86c2-4534-9022-285996c480c3",
+      "name": "User banned?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-admin",
+              "leftValue": "={{ $json.admin_active }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -64,
+        288
+      ],
+      "id": "8d6cc698-3300-4b3f-b566-c3161f91ac64",
+      "name": "Admin mode active?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=⛔️ You are banned from using this bot.\n\nContact support: @PocketSound_bot\n\n/support\n@PocketSound_bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -288,
+        112
+      ],
+      "id": "6aff5ba8-0e1f-4adc-845c-bd53b81b85d3",
+      "name": "Send banned message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=❄️ Admin mode is active. You cannot create playlists.\n\n@PocketSound_bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -64,
+        112
+      ],
+      "id": "4369cb74-a5c2-4155-98da-b42901daf350",
+      "name": "Send admin mode message"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COUNT(p.id)::INTEGER AS current_playlists, (COALESCE(ul.max_playlists, 3) + COALESCE(ul.extra_playlists_purchased, 0))::INTEGER AS max_allowed FROM pocketsound_users u LEFT JOIN pocketsound_playlists p ON p.user_id = u.id LEFT JOIN pocketsound_user_limits ul ON ul.user_id = u.id WHERE u.id = {{ $('Check user in DB').first().json.id }} GROUP BY u.id, ul.max_playlists, ul.extra_playlists_purchased;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        176,
+        304
+      ],
+      "id": "be66dcab-1732-412d-8543-f08b2786642e",
+      "name": "Check playlist limits",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-limit",
+              "leftValue": "={{ $json.current_playlists }}",
+              "rightValue": "={{ $json.max_allowed }}",
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        384,
+        304
+      ],
+      "id": "29d65d6c-c5e5-4acf-b118-37670eecca1e",
+      "name": "Under playlist limit?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Parse Create command').item.json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=🎵 You've reached the limit! You already have {{ $json.current_playlists }}/{{ $json.max_allowed }} playlists.\n\nYou can edit your playlists and delete one.\n\n@PocketSound_bot"
+            },
+            {
+              "name": "reply_markup",
+              "value": "{\"inline_keyboard\":[[{\"text\":\"✏️ Edit Playlist\",\"callback_data\":\"/edit|\"}],[{\"text\":\"🔙 Back\",\"callback_data\":\"/back\"}]]}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        608,
+        432
+      ],
+      "id": "40c7c415-3a79-4224-a725-c40b4fe3536d",
+      "name": "Send limit reached message"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO pocketsound_user_states (user_id, current_state, state_started_at, updated_at) VALUES ({{ $('Check user in DB').first().json.id }}, 'awaiting_playlist_name|create', NOW(), NOW()) ON CONFLICT (user_id) DO UPDATE SET current_state = 'awaiting_playlist_name|create', state_started_at = NOW(), updated_at = NOW();",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        592,
+        192
+      ],
+      "id": "441f17fa-134d-4144-b021-0dee2f698fb0",
+      "name": "Set user state (awaiting name)",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Parse Create command').item.json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "📝 Create New Playlist\n\nPlease send me the playlist name (max 100 characters)\n\n⏱ You have 10 minutes to reply\n\n@PocketSound_bot"
+            },
+            {
+              "name": "reply_markup",
+              "value": "{\"inline_keyboard\":[[{\"text\":\"🔙 Back\",\"callback_data\":\"/back\"}]]}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        816,
+        192
+      ],
+      "id": "67a3c77e-eb70-4e0f-abad-72786b98d69c",
+      "name": "Ask for playlist name"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "🔡 User clicked Create Playlist button\n\nUsername: @{{ $('Parse Create command').item.json.username }}\nFirst Name: {{ $('Parse Create command').item.json.first_name }}\nTGID: {{ $('Parse Create command').item.json.chat_id }}\n\nUser is now awaiting playlist name (10 min timeout)"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $('Check user in DB').item.json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1040,
+        192
+      ],
+      "id": "29ffecfb-9a56-4eaf-b860-50dc428e6759",
+      "name": "Notify admin"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=⛔️ BANNED USER TRIED TO Create Playlist Button ⛔️\n\nUser: @{{ $('Parse Create command').item.json.username }}\nTG ID: {{ $('Parse Create command').item.json.chat_id }}\nBan reason: {{ $json.ban_reason || 'N/A' }}\n\n❄️ Admin mode is ACTIVE for this user.\n\nTo unban: /admin_false {{ $('Parse Create command').item.json.chat_id }}"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -288,
+        -64
+      ],
+      "id": "01e92a6b-631d-4439-ab53-dc8f053f8e98",
+      "name": "Notify admin about banned user"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔄 User pressed Create Playlist Button (Admin mode ACTIVE)\n\nUser: @{{ $('Parse Create command').item.json.username }}\nTG ID: {{ $('Parse Create command').item.json.chat_id }}\nFirst name: {{ $('Parse Create command').item.json.first_name }}\nPremium: {{ $('Parse Create command').item.json.is_premium }}\n\n❄️ Admin dialog is active. User cannot create playlists."
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -64,
+        -64
+      ],
+      "id": "2276413f-a9aa-42f2-9f31-6dae2c6fcd7a",
+      "name": "Notify admin about admin mode"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1264,
+        192
+      ],
+      "id": "e73ddc7f-9cb0-4694-b4d4-a399f18bcf67",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1280,
+        432
+      ],
+      "id": "521c0abf-8575-4fbd-a3cb-815c1317675c",
+      "name": "No Operation, do nothing50"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list",
+          "cachedResultName": "pocketsound_users"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.result.chat.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        832,
+        432
+      ],
+      "id": "9517051b-ea8b-4914-b4b8-e95803a42042",
+      "name": "user есть в DB?",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "Проверяем есть ли пользователь в DB"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔡 User already have 3 playlists\nHe can not crate more for now\n\nUsername: @{{ $json.tg_username }}\nFirst Name: {{ $json.tg_first_name }}\nTGID: {{ $json.tg_id }}"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1056,
+        432
+      ],
+      "id": "9bc3f283-6ab5-479b-b817-2aeb62d5a3c4",
+      "name": "Send message to admin chat (user topic)",
+      "notes": "Отправка сообщения пользователя в топик"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Parse Create command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Create command": {
+      "main": [
+        [
+          {
+            "node": "Check user in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check user in DB": {
+      "main": [
+        [
+          {
+            "node": "User banned?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User banned?": {
+      "main": [
+        [
+          {
+            "node": "Send banned message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Admin mode active?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Admin mode active?": {
+      "main": [
+        [
+          {
+            "node": "Send admin mode message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check playlist limits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send banned message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about banned user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send admin mode message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about admin mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check playlist limits": {
+      "main": [
+        [
+          {
+            "node": "Under playlist limit?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Under playlist limit?": {
+      "main": [
+        [
+          {
+            "node": "Set user state (awaiting name)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send limit reached message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set user state (awaiting name)": {
+      "main": [
+        [
+          {
+            "node": "Ask for playlist name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask for playlist name": {
+      "main": [
+        [
+          {
+            "node": "Notify admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify admin": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send limit reached message": {
+      "main": [
+        [
+          {
+            "node": "user есть в DB?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "user есть в DB?": {
+      "main": [
+        [
+          {
+            "node": "Send message to admin chat (user topic)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message to admin chat (user topic)": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing50",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "8bdbd10a-d0b3-4f18-a6c6-485e15bcdcfb",
+  "meta": {
+    "instanceId": "148b2b278c24b3c49bc4399db7e7ce15ed94f5b1044d28401c56f6ab511f0347"
+  },
+  "id": "w4CpwepqZPnce34X",
+  "tags": []
+}

@@ -1,0 +1,670 @@
+{
+  "name": "Handler: admin_commands /r",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1072,
+        656
+      ],
+      "id": "86c67fd2-099f-46ba-8e73-e53116e2614a",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body;\nconst message = body.message;\nconst text = message?.text || '';\nconst chatId = message?.chat?.id;\nconst messageId = message?.message_id;\n\nconst SUPPORT_CHAT_ID = -1003381734836;\n\n// Check if command is from support chat\nif (chatId !== SUPPORT_CHAT_ID) {\n  // Check if this is an admin command attempt\n  const isAdminCommand = text.startsWith('/reply_') || \n                         text.startsWith('/support_') || \n                         text.startsWith('/admin_true') || \n                         text.startsWith('/admin_false');\n  \n  if (isAdminCommand) {\n    // Return data for unauthorized attempt (will be handled by next node)\n    return [{\n      json: {\n        unauthorized: true,\n        from_id: message?.from?.id,\n        from_username: message?.from?.username,\n        from_first_name: message?.from?.first_name,\n        command_text: text,\n        chat_id: chatId\n      }\n    }];\n  }\n  return [];\n}\n\n// Get admin info (who sent the command)\nconst admin = message?.from;\nconst adminId = admin?.id || null;\nconst adminUsername = admin?.username || null;\nconst adminFirstName = admin?.first_name || '';\n\nlet commandType = null;\nlet targetUserId = null;\nlet replyText = null;\n\nif (text.startsWith('/reply_')) {\n  const match = text.match(/^\\/reply_(\\d+)\\s+(.+)/);\n  if (match) {\n    commandType = 'reply';\n    targetUserId = Number(match[1]);\n    replyText = match[2];\n  }\n}\nelse if (text.startsWith('/support_')) {\n  const match = text.match(/^\\/support_(\\d+)\\s+(.+)/);\n  if (match) {\n    commandType = 'support';\n    targetUserId = Number(match[1]);\n    replyText = match[2];\n  }\n}\nelse if (text.startsWith('/admin_true')) {\n  const match = text.match(/^\\/admin_true\\s+(\\d+)/);\n  if (match) {\n    commandType = 'admin_true';\n    targetUserId = Number(match[1]);\n  }\n}\nelse if (text.startsWith('/admin_false')) {\n  const match = text.match(/^\\/admin_false\\s+(\\d+)/);\n  if (match) {\n    commandType = 'admin_false';\n    targetUserId = Number(match[1]);\n  }\n}\n\nreturn [{\n  json: {\n    command_type: commandType,\n    target_user_id: targetUserId,\n    reply_text: replyText,\n    admin_chat_id: chatId,\n    admin_message_id: messageId,\n    admin_id: adminId,\n    admin_username: adminUsername,\n    admin_first_name: adminFirstName,\n    unauthorized: false\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -848,
+        656
+      ],
+      "id": "b0b0cb5e-f83c-4f1b-aabc-985def1186fc",
+      "name": "Parse admin command"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command_type }}",
+                    "rightValue": "reply",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "route-reply"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reply"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "route-support",
+                    "leftValue": "={{ $json.command_type }}",
+                    "rightValue": "support",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "support"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "route-true",
+                    "leftValue": "={{ $json.command_type }}",
+                    "rightValue": "admin_true",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "admin_true"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "route-false",
+                    "leftValue": "={{ $json.command_type }}",
+                    "rightValue": "admin_false",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "admin_false"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -368,
+        640
+      ],
+      "id": "440299dd-d55e-48b0-9b7e-48c1946011ac",
+      "name": "Route by command type"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.target_user_id }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.reply_text }}"
+            },
+            {
+              "name": "parse_mode",
+              "value": "HTML"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        16,
+        400
+      ],
+      "id": "67c15033-f3db-403c-8e4a-782e4e7ed1d8",
+      "name": "Send reply to user"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.target_user_id }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.reply_text }}"
+            },
+            {
+              "name": "parse_mode",
+              "value": "HTML"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        16,
+        560
+      ],
+      "id": "d4b0f15f-572e-4f35-9dbc-0e989b242714",
+      "name": "Send support reply"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE pocketsound_users \nSET admin_active = TRUE, updated_at = NOW() \nWHERE tg_id = {{ $json.target_user_id }};",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        16,
+        752
+      ],
+      "id": "7ac92a36-dd74-41f4-9cf8-3820b9591ec5",
+      "name": "Enable admin mode",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE pocketsound_users \nSET admin_active = FALSE, updated_at = NOW() \nWHERE tg_id = {{ $json.target_user_id }};",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        16,
+        944
+      ],
+      "id": "57bdc127-e4c5-4bad-a1e9-ead03ed353d2",
+      "name": "Disable admin mode",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "=-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "reply_to_message_id",
+              "value": "={{ $('Parse admin command').item.json.admin_message_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=✅ Reply sent to user: {{ $('Parse admin command').item.json.reply_text }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        400
+      ],
+      "id": "41e03c14-2035-49f7-8583-a204287d2fe6",
+      "name": "Confirm reply sent"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "=-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "reply_to_message_id",
+              "value": "={{ $('Parse admin command').item.json.admin_message_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=✅ Support reply sent to user: {{ $('Parse admin command').item.json.reply_text }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        560
+      ],
+      "id": "5fd6352d-3fe3-48b0-9cf5-2373798c7fe4",
+      "name": "Confirm support reply sent"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "=-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "reply_to_message_id",
+              "value": "={{ $('Parse admin command').item.json.admin_message_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=❄️ Admin mode ENABLED for user:\nUser id: {{ $json.tg_id }}\ntg_username: {{ $json.tg_username }}\ntg_first_name: {{ $json.tg_first_name }}\n\ntg_premium: {{ $json.premium }}\nlanguage_code: {{ $json.language_code }}\n\nStarted bot at: {{ $json.created_at }}\n\nis_banned: {{ $json.is_banned }}\n\nKicked_bot: {{ $json.is_bot_kicked }}\n❄️ ❄️ ❄️\nAdmin_active: {{ $json.admin_active }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        432,
+        752
+      ],
+      "id": "ed222bc2-2c07-4e8c-9315-1712c9cb12a4",
+      "name": "Confirm admin mode enabled"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "=-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "reply_to_message_id",
+              "value": "={{ $('Parse admin command').item.json.admin_message_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=⚛️ Admin mode DISABLED for user:\n\nUser id: {{ $json.tg_id }}\ntg_username: {{ $json.tg_username }}\ntg_first_name: {{ $json.tg_first_name }}\n\ntg_premium: {{ $json.premium }}\nlanguage_code: {{ $json.language_code }}\n\nStarted bot at: {{ $json.created_at }}\n\nis_banned: {{ $json.is_banned }}\n\nKicked_bot: {{ $json.is_bot_kicked }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        432,
+        944
+      ],
+      "id": "f85c240a-afcf-426d-baf4-83013c5ac679",
+      "name": "Confirm admin mode disabled"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $('Parse admin command').item.json.target_user_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        240,
+        752
+      ],
+      "id": "8799d654-a990-4053-9768-0e6f73009f92",
+      "name": "Check user in DB",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $('Parse admin command').item.json.target_user_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        240,
+        944
+      ],
+      "id": "acbaf6b4-9a06-417e-93e2-e08932c05d76",
+      "name": "Check user in DB1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-unauthorized",
+              "leftValue": "={{ $json.unauthorized }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -624,
+        656
+      ],
+      "id": "b60b367f-b54e-4d1d-bb8e-ff9671e89522",
+      "name": "Unauthorized?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=⚠️ UNAUTHORIZED ADMIN COMMAND ATTEMPT ⚠️\n\nUser: @{{ $json.from_username || 'No username' }} \n(ID: {{ $json.from_id }})\nFirst Name: {{ $json.from_first_name || 'N/A' }}\nCommand: `{{ $json.command_text }}`\nChat ID: {{ $json.chat_id }}\n\nThis command was ignored.\n\nRec. Freeze user with command /admin_true {{ $json.from_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -624,
+        480
+      ],
+      "id": "18ed142d-6ce2-460b-9787-74530a1471c2",
+      "name": "Notify unauthorized attempt"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Parse admin command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse admin command": {
+      "main": [
+        [
+          {
+            "node": "Unauthorized?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by command type": {
+      "main": [
+        [
+          {
+            "node": "Send reply to user",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send support reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enable admin mode",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Disable admin mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send reply to user": {
+      "main": [
+        [
+          {
+            "node": "Confirm reply sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send support reply": {
+      "main": [
+        [
+          {
+            "node": "Confirm support reply sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enable admin mode": {
+      "main": [
+        [
+          {
+            "node": "Check user in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Disable admin mode": {
+      "main": [
+        [
+          {
+            "node": "Check user in DB1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check user in DB": {
+      "main": [
+        [
+          {
+            "node": "Confirm admin mode enabled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check user in DB1": {
+      "main": [
+        [
+          {
+            "node": "Confirm admin mode disabled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unauthorized?": {
+      "main": [
+        [
+          {
+            "node": "Notify unauthorized attempt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Route by command type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "0aa12627-ca26-4552-a852-f9a15d847d4a",
+  "meta": {
+    "instanceId": "148b2b278c24b3c49bc4399db7e7ce15ed94f5b1044d28401c56f6ab511f0347"
+  },
+  "id": "h13eu121naGDSDOl",
+  "tags": []
+}

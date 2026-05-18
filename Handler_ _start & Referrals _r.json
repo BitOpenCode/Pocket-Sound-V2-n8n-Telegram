@@ -1,0 +1,2447 @@
+{
+  "name": "Handler: /start & Referrals /r",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1376,
+        624
+      ],
+      "id": "db0398c2-da41-4f6a-b1e2-2e212cfc3ed0",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract data from incoming webhook from Receiver\nconst body = $json.body;\nconst message = body.message;\nconst chatId = message.chat.id;\nconst text = message.text || '';\n\n// Check for referral link: /start CODE\nlet referralCode = null;\nif (text.startsWith('/start ')) {\n  referralCode = text.substring(7).trim();\n}\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    username: message.chat.username || null,\n    first_name: message.chat.first_name || '',\n    last_name: message.chat.last_name || '',\n    is_premium: message.from?.is_premium || false,\n    language_code: message.from?.language_code || 'en',\n    is_bot: message.from?.is_bot || false,\n    referral_code: referralCode,\n    raw_message: message\n  }\n}];"
+      },
+      "id": "ca7d004e-dea4-449d-9a01-7d3c272e0c3f",
+      "name": "Parse /start command",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1184,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list",
+          "cachedResultName": "pocketsound_users"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.chat_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4e87b890-ba13-4499-9512-c8d754be5f5e",
+      "name": "Check user in DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -704,
+        352
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-banned",
+              "leftValue": "={{ $json.is_banned }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4d1c1df6-e10e-4157-b6c3-dc1db504b564",
+      "name": "User banned?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -464,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-admin-active",
+              "leftValue": "={{ $json.admin_active }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "72f31be4-8a96-47fb-9779-b633eb15cc7f",
+      "name": "Admin dialog active?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -224,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Parse /start command').item.json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=⛔️ You are banned from using this bot.\n\nReason: {{ $json.ban_reason || 'Violation of rules' }}\n\nContact support: @PocketSound_bot\n\n/support\n@PocketSound_bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "547b6035-2d4a-4762-ab29-1888e270683f",
+      "name": "Send banned message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -464,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=⛔️ BANNED USER TRIED TO START BOT ⛔️\n\nUser: @{{ $('Parse /start command').item.json.username }}\nTG ID: {{ $('Parse /start command').item.json.chat_id }}\nBan reason: {{ $json.ban_reason || 'N/A' }}\n\n❄️ Admin mode is ACTIVE for this user.\n\nTo unban: `/admin_false {{ $('Parse /start command').item.json.chat_id }}`"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fc9ea67f-2836-48cf-96ee-b22c369bf6b2",
+      "name": "Notify admin about banned user",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -464,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Parse /start command').item.json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=❄️ Admin mode is active ❄️\n\nYou cannot use the bot right now.\n\nPlease wait for admin to resolve your issue.\n\n@PocketSound_bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1005d13c-96da-459a-b166-a41f1d5bdca4",
+      "name": "Send admin mode message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -208,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔄 User restarted bot (Admin mode ACTIVE)\n\nUser: @{{ $('Parse /start command').item.json.username }}\nTG ID: {{ $('Parse /start command').item.json.chat_id }}\nFirst name: {{ $('Parse /start command').item.json.first_name }}\nPremium: {{ $('Parse /start command').item.json.is_premium }}\n\n❄️ Admin dialog is active. User cannot use /start."
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cf0822f5-29da-48bb-894c-0575d36132f5",
+      "name": "Notify admin about restart",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -208,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-exists",
+              "leftValue": "={{ $json.tg_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "41ebaa47-0651-4648-981e-82fbdf3526b7",
+      "name": "User exists in DB?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        64,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/createForumTopic",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "name",
+              "value": "={{ $('Parse /start command').item.json.chat_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c303459d-ea6a-4548-ab46-6bc8621c26b5",
+      "name": "Create support topic for user",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        288,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list",
+          "cachedResultName": "pocketsound_users"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tg_id": "={{ $('Parse /start command').item.json.chat_id }}",
+            "tg_username": "={{ $('Parse /start command').item.json.username }}",
+            "tg_first_name": "={{ $('Parse /start command').item.json.first_name }}",
+            "tg_last_name": "={{ $('Parse /start command').item.json.last_name }}",
+            "premium": "={{ $('Parse /start command').item.json.is_premium }}",
+            "language_code": "={{ $('Parse /start command').item.json.language_code }}",
+            "is_bot": "={{ $('Parse /start command').item.json.is_bot }}",
+            "user_role": "user",
+            "support_topic_id": "={{ $json.result.message_thread_id }}",
+            "referrer_id": "={{ $('Parse /start command').item.json.referral_code ? Number($('Parse /start command').item.json.referral_code) : null }}"
+          },
+          "matchingColumns": [
+            "tg_id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "tg_id",
+              "displayName": "tg_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tg_username",
+              "displayName": "tg_username",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "tg_first_name",
+              "displayName": "tg_first_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "tg_last_name",
+              "displayName": "tg_last_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "photo_url",
+              "displayName": "photo_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "removed": true
+            },
+            {
+              "id": "premium",
+              "displayName": "premium",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "language_code",
+              "displayName": "language_code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "balance_stars",
+              "displayName": "balance_stars",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false,
+              "removed": true
+            },
+            {
+              "id": "balance_wallet",
+              "displayName": "balance_wallet",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false,
+              "removed": true
+            },
+            {
+              "id": "user_role",
+              "displayName": "user_role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "is_bot",
+              "displayName": "is_bot",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "last_active_at",
+              "displayName": "last_active_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "is_banned",
+              "displayName": "is_banned",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false,
+              "removed": true
+            },
+            {
+              "id": "ban_reason",
+              "displayName": "ban_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "removed": true
+            },
+            {
+              "id": "banned_at",
+              "displayName": "banned_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false,
+              "removed": true
+            },
+            {
+              "id": "support_topic_id",
+              "displayName": "support_topic_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "referral_link",
+              "displayName": "referral_link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "removed": true
+            },
+            {
+              "id": "is_bot_kicked",
+              "displayName": "is_bot_kicked",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false,
+              "removed": true
+            },
+            {
+              "id": "music_api_mode",
+              "displayName": "music_api_mode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "removed": true
+            },
+            {
+              "id": "is_email_confirmed",
+              "displayName": "is_email_confirmed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false,
+              "removed": true
+            },
+            {
+              "id": "referrer_id",
+              "displayName": "referrer_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "e19241ad-d686-4a1c-b70f-b92b398394eb",
+      "name": "Upsert user to DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        480,
+        496
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const tgid = $('Parse /start command').first().json.chat_id;\nconst referralCode = $('Parse /start command').first().json.referral_code;\n\nlet referralLink = `https://t.me/PocketSound_bot?start=${tgid}`;\n\n// Process referral code (if user came via link)\nlet referrerId = null;\nif (referralCode && !isNaN(Number(referralCode))) {\n  referrerId = Number(referralCode);\n}\n\nreturn {\n  json: {\n    tg_id: tgid,\n    referral_link: referralLink,\n    referrer_id: referrerId,\n    is_referral: !!referrerId\n  }\n};"
+      },
+      "id": "9186bf61-99b8-4937-8669-fa55ee7bc5a4",
+      "name": "Generate referral link",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE pocketsound_users \nSET referral_link = '{{ $json.referral_link }}',\n    referrer_id = {{ $json.referrer_id || 'NULL' }},\n    updated_at = NOW()\nWHERE tg_id = {{ $json.tg_id }};",
+        "options": {}
+      },
+      "id": "b607bfc6-f23c-435d-a96d-9d18f752fe8a",
+      "name": "Update referral link in DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        880,
+        496
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO pocketsound_coin_balances (user_id, balance)\nVALUES (\n  (SELECT id FROM pocketsound_users WHERE tg_id = {{ $('Parse /start command').item.json.chat_id }}),\n  0\n)\nON CONFLICT (user_id) DO NOTHING;",
+        "options": {}
+      },
+      "id": "6d3b9265-f7f9-4ea7-844c-f2e3fa2abfd6",
+      "name": "Initialize coin balance (0)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1104,
+        496
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list",
+          "cachedResultName": "pocketsound_users"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $('Parse /start command').item.json.chat_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8749d850-96e9-4d8b-b457-ba894d4be45c",
+      "name": "Get user data from DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1312,
+        496
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🎉 NEW USER REGISTERED! 🎉\nUser: @{{ $('Parse /start command').item.json.username }}\nTG ID: {{ $('Parse /start command').item.json.chat_id }}\nFirst name: {{ $('Parse /start command').item.json.first_name }}\nPremium: {{ $('Parse /start command').item.json.is_premium }}\nLanguage: {{ $('Parse /start command').item.json.language_code }}\nReferral: {{ $json.referrer_id ? 'Yes (from ' + $json.referrer_id + ')' : 'No' }}\nCreated at: {{ $json.created_at }}\nSupport topic ID: {{ $json.support_topic_id }}🪙 \n\nBalance: 0\n\n@PocketSound_bot"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ae2a67d8-e235-43ef-a30f-6e9ce7738afe",
+      "name": "Notify admin about new user",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1520,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendPhoto",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Parse /start command').item.json.chat_id }}"
+            },
+            {
+              "name": "photo",
+              "value": "https://silver-perfect-barracuda-186.mypinata.cloud/ipfs/bafkreidjuficdk5vzzdga5xua2rjj657ka276jft4m4ootwag7227bxtny"
+            },
+            {
+              "name": "caption",
+              "value": "=⭐️ Welcome to Pocket Sound! ⭐️\n\n🎼 Telegram Based Sound App\n\n🎧 Your personal music library in Telegram\n\n• Send me audio files to save them\n• Search music by artist or song name\n• Create playlists (up to 3, 33 tracks each)\n• Share tracks with friends\n\n🔗 Your referral link:\n{{ $('Generate referral link').item.json.referral_link }}\n\n🎁 Invite friends and get balance!\n\nOpen Menu to explore all features 🎧\n\n@PocketSound_bot"
+            },
+            {
+              "name": "reply_markup",
+              "value": "{\"inline_keyboard\":[[{\"text\":\"🎵 Open Menu\",\"callback_data\":\"/menu\"}]]}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "98aff3ef-ec03-4423-8e90-8f22ebbca394",
+      "name": "Send welcome message to user",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1728,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=✅ User /start completed ✅\n\nUser: @{{ $('Parse /start command').item.json.username }}\nTG ID: {{ $('Parse /start command').item.json.chat_id }}\n\nWelcome message sent. User is ready to use the bot."
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4d503c65-022c-48a4-8cf0-564cf1d533ee",
+      "name": "Notify admin completion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1952,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE pocketsound_users\nSET\n  tg_username = '{{ $('Parse /start command').item.json.username }}',\n  tg_first_name = '{{ $('Parse /start command').item.json.first_name }}',\n  tg_last_name = '{{ $('Parse /start command').item.json.last_name }}',\n  premium = {{ $('Parse /start command').item.json.is_premium }},\n  language_code = '{{ $('Parse /start command').item.json.language_code }}',\n  updated_at = NOW()\nWHERE tg_id = {{ $('Parse /start command').item.json.chat_id }};",
+        "options": {}
+      },
+      "id": "fed884eb-536b-4f65-931b-2bc87ed6517c",
+      "name": "Update existing user data",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        688,
+        240
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Parse /start command').item.json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=🔄 Welcome back! 🔄\n\nOpen Menu to continue exploring Pocket Sound!\n\n@PocketSound_bot"
+            },
+            {
+              "name": "reply_markup",
+              "value": "{\"inline_keyboard\":[[{\"text\":\"🎵 Open Menu\",\"callback_data\":\"/menu\"}]]}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6db29cac-dfaf-42b5-bf75-388c6192699f",
+      "name": "Send welcome back message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        288,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔄 EXISTING USER RESTARTED 🔄\n\nUser: @{{ $('Parse /start command').item.json.username }}\nTG ID: {{ $('Parse /start command').item.json.chat_id }}\n\nWelcome back message sent."
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $('Check user in DB').item.json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8c4e5ac2-f51c-4858-91d5-515fedab9eb1",
+      "name": "Notify admin about existing user",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        496,
+        240
+      ]
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        896,
+        240
+      ],
+      "id": "fdb1c580-24e2-4dd3-81e5-a682c818ab3c",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2160,
+        496
+      ],
+      "id": "bc0d175f-d186-4319-bfea-c49df528533e",
+      "name": "No Operation, do nothing1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ec781680-1d3d-49e6-89f3-85d2c227b4a1",
+              "leftValue": "={{ $json.raw_message.text }}",
+              "rightValue": "/start",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -976,
+        624
+      ],
+      "id": "5e47e643-f0d0-4ec7-81c6-4306f2de00f1",
+      "name": "is it /start or ref start?"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list",
+          "cachedResultName": "pocketsound_users"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.chat_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1c122c31-057e-46be-8a9f-022d4a40ee3e",
+      "name": "Check user in DB1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -704,
+        944
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-banned",
+              "leftValue": "={{ $json.is_banned }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d27afe6a-bd48-471f-9c65-35c86629980b",
+      "name": "User banned?1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -464,
+        944
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-admin-active",
+              "leftValue": "={{ $json.admin_active }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e5516daf-be12-4946-915c-a8499ade99e4",
+      "name": "Admin dialog active?1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -224,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Parse /start command').item.json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=⛔️ You are banned from using this bot.\n\nReason: {{ $json.ban_reason || 'Violation of rules' }}\n\nContact support: @PocketSound_support\n\n@PocketSound_bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ee27e1c1-9455-4d9c-888e-8e46ba5f2a60",
+      "name": "Send banned message1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -464,
+        768
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=⛔️ BANNED USER TRIED TO START BOT ⛔️\n\nUser: @{{ $('Parse /start command').item.json.username }}\nTG ID: {{ $('Parse /start command').item.json.chat_id }}\nBan reason: {{ $json.ban_reason || 'N/A' }}\n\n❄️ Admin mode is ACTIVE for this user.\n\nTo unban: `/admin_false {{ $('Parse /start command').item.json.chat_id }}`"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "335d9fcc-81e7-452a-97a6-0c4feb0a2614",
+      "name": "Notify admin about banned user1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -464,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Parse /start command').item.json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=❄️ Admin mode is active ❄️\n\nYou cannot use the bot right now.\n\nPlease wait for admin to resolve your issue.\n\n@PocketSound_bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "afccac40-103a-48f0-a3c1-b922f980169a",
+      "name": "Send admin mode message1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -208,
+        784
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔄 User restarted bot (Admin mode ACTIVE)\n\nUser: @{{ $('Parse /start command').item.json.username }}\nTG ID: {{ $('Parse /start command').item.json.chat_id }}\nFirst name: {{ $('Parse /start command').item.json.first_name }}\nPremium: {{ $('Parse /start command').item.json.is_premium }}\n\n❄️ Admin dialog is active. User cannot use /start."
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "408dd6a7-cc48-4371-a406-e8f901980f64",
+      "name": "Notify admin about restart1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -208,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, tg_id, is_banned FROM pocketsound_users WHERE tg_id = {{ $('Parse /start command').first().json.referral_code }} LIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        16,
+        976
+      ],
+      "id": "618555f7-0b06-493b-818f-0c19c5c4045b",
+      "name": "Execute a SQL query1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const parseData = $('Parse /start command').first().json;\nconst existingUser = $('Check user in DB1').first().json;\nconst referrerRow = $('Execute a SQL query1').first().json; \n\nconst newUserId = parseData.chat_id;\nconst referralCode = parseData.referral_code;\n\nlet referrerId = null;\nlet isReferralValid = false;\nlet bonusAmount = 5;\n\nif (referralCode && !isNaN(Number(referralCode))) {\n  const potentialReferrerId = Number(referralCode);\n  if (potentialReferrerId !== newUserId) {\n    if (referrerRow && referrerRow.id && !referrerRow.is_banned) {\n      if (!existingUser || existingUser.referrer_id === null) {\n        referrerId = potentialReferrerId;\n        isReferralValid = true;\n      }\n    }\n  }\n}\n\nreturn [{\n  json: {\n    chat_id: newUserId,\n    username: parseData.username,\n    first_name: parseData.first_name,\n    last_name: parseData.last_name,\n    is_premium: parseData.is_premium,\n    language_code: parseData.language_code,\n    is_bot: parseData.is_bot,\n    referral_code: referralCode,\n    referrer_id: referrerId,\n    is_referral_valid: isReferralValid,\n    bonus_amount: bonusAmount,\n    is_new_user: !existingUser\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        192,
+        976
+      ],
+      "id": "d6bfef69-cc96-49f1-9faf-669962cb329c",
+      "name": "Code1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b75a26e6-b238-4483-9a4d-83b5dfbb8bfa",
+              "leftValue": "={{ $json.chat_id }}",
+              "rightValue": "={{ $json.referral_code }}",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        384,
+        976
+      ],
+      "id": "3c302a61-c7ff-431f-9124-66da652860c3",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Parse /start command').item.json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=🔄 Welcome back! 🔄\n\nOpen Menu to continue exploring Pocket Sound!\n\n⚠️ You cannot use your own referral link.\n\nInvite friends instead!\n\n@PocketSound_bot"
+            },
+            {
+              "name": "reply_markup",
+              "value": "{\"inline_keyboard\":[[{\"text\":\"🎵 Open Menu\",\"callback_data\":\"/menu\"}]]}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        672,
+        864
+      ],
+      "id": "f6e21c67-8a7a-4d26-8cbc-d531079161a5",
+      "name": "Send self‑referral warning"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE pocketsound_users\nSET\n  tg_username = '{{ $('Parse /start command').item.json.username }}',\n  tg_first_name = '{{ $('Parse /start command').item.json.first_name }}',\n  tg_last_name = '{{ $('Parse /start command').item.json.last_name }}',\n  premium = {{ $('Parse /start command').item.json.is_premium }},\n  language_code = '{{ $('Parse /start command').item.json.language_code }}',\n  updated_at = NOW()\nWHERE tg_id = {{ $('Parse /start command').item.json.chat_id }};",
+        "options": {}
+      },
+      "id": "2360c9e4-519f-4feb-9249-d7d8ce5ee46d",
+      "name": "Update existing user data1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1104,
+        864
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1328,
+        864
+      ],
+      "id": "2e4f555f-b1d1-4e80-87bc-6d3df7f1b840",
+      "name": "No Operation, do nothing2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔄 EXISTING USER RESTARTED WITH OWN REF LINK 👀\n\nUser: @{{ $('Parse /start command').item.json.username }}\nTG ID: {{ $('Parse /start command').item.json.chat_id }}\n\nWelcome back message sent:\n{{ $json.result.text }}"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $('Check user in DB1').item.json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2f71d171-14e5-4162-bf51-fde14f85d6d9",
+      "name": "Notify admin about user ref",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        896,
+        864
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list",
+          "cachedResultName": "pocketsound_users"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tg_id": "={{ $('Parse /start command').item.json.chat_id }}",
+            "tg_username": "={{ $('Parse /start command').item.json.username }}",
+            "tg_first_name": "={{ $('Parse /start command').item.json.first_name }}",
+            "tg_last_name": "={{ $('Parse /start command').item.json.last_name }}",
+            "premium": "={{ $('Parse /start command').item.json.is_premium }}",
+            "language_code": "={{ $('Parse /start command').item.json.language_code }}",
+            "is_bot": "={{ $('Parse /start command').item.json.is_bot }}",
+            "user_role": "user",
+            "support_topic_id": "={{ $json.result.message_thread_id }}",
+            "referrer_id": "={{ $('Parse /start command').item.json.referral_code ? Number($('Parse /start command').item.json.referral_code) : null }}"
+          },
+          "matchingColumns": [
+            "tg_id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "tg_id",
+              "displayName": "tg_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tg_username",
+              "displayName": "tg_username",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "tg_first_name",
+              "displayName": "tg_first_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "tg_last_name",
+              "displayName": "tg_last_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "photo_url",
+              "displayName": "photo_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "removed": true
+            },
+            {
+              "id": "premium",
+              "displayName": "premium",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "language_code",
+              "displayName": "language_code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "balance_stars",
+              "displayName": "balance_stars",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false,
+              "removed": true
+            },
+            {
+              "id": "balance_wallet",
+              "displayName": "balance_wallet",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false,
+              "removed": true
+            },
+            {
+              "id": "user_role",
+              "displayName": "user_role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "is_bot",
+              "displayName": "is_bot",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "last_active_at",
+              "displayName": "last_active_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "is_banned",
+              "displayName": "is_banned",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false,
+              "removed": true
+            },
+            {
+              "id": "ban_reason",
+              "displayName": "ban_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "removed": true
+            },
+            {
+              "id": "banned_at",
+              "displayName": "banned_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false,
+              "removed": true
+            },
+            {
+              "id": "support_topic_id",
+              "displayName": "support_topic_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "referral_link",
+              "displayName": "referral_link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "removed": true
+            },
+            {
+              "id": "is_bot_kicked",
+              "displayName": "is_bot_kicked",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false,
+              "removed": true
+            },
+            {
+              "id": "music_api_mode",
+              "displayName": "music_api_mode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "removed": true
+            },
+            {
+              "id": "is_email_confirmed",
+              "displayName": "is_email_confirmed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false,
+              "removed": true
+            },
+            {
+              "id": "referrer_id",
+              "displayName": "referrer_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "admin_active",
+              "displayName": "admin_active",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "8c4d97ef-09a1-4643-b211-b3d3208acd85",
+      "name": "Upsert user to DB1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        864,
+        1088
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const tgid = $('Parse /start command').first().json.chat_id;\nconst referralCode = $('Parse /start command').first().json.referral_code;\n\nlet referralLink = `https://t.me/PocketSound_bot?start=${tgid}`;\n\n// Process referral code (if user came via link)\nlet referrerId = null;\nif (referralCode && !isNaN(Number(referralCode))) {\n  referrerId = Number(referralCode);\n}\n\nreturn {\n  json: {\n    tg_id: tgid,\n    referral_link: referralLink,\n    referrer_id: referrerId,\n    is_referral: !!referrerId\n  }\n};"
+      },
+      "id": "24af2079-dc45-4d02-abc7-0d527be9c05d",
+      "name": "Generate referral link1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        1088
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE pocketsound_users \nSET referral_link = '{{ $json.referral_link }}',\n    referrer_id = {{ $json.referrer_id || 'NULL' }},\n    updated_at = NOW()\nWHERE tg_id = {{ $json.tg_id }};",
+        "options": {}
+      },
+      "id": "56715993-c9fc-4132-b3db-636e6ded0500",
+      "name": "Update referral link in DB1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1264,
+        1088
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO pocketsound_coin_balances (user_id, balance)\nVALUES (\n  (SELECT id FROM pocketsound_users WHERE tg_id = {{ $('Parse /start command').item.json.chat_id }}),\n  0\n)\nON CONFLICT (user_id) DO NOTHING;",
+        "options": {}
+      },
+      "id": "6715010c-7362-4a57-90fc-4f475c614640",
+      "name": "Initialize coin balance (0)1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1488,
+        1088
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list",
+          "cachedResultName": "pocketsound_users"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $('Parse /start command').item.json.chat_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6f04da88-3867-48e1-a2d4-af1be2228631",
+      "name": "Get user data from DB1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1696,
+        1088
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🎉 NEW USER REGISTERED VIA REF! 🎉\nUser: @{{ $('Parse /start command').item.json.username }}\nTG ID: {{ $('Parse /start command').item.json.chat_id }}\nFirst name: {{ $('Parse /start command').item.json.first_name }}\nPremium: {{ $('Parse /start command').item.json.is_premium }}\nLanguage: {{ $('Parse /start command').item.json.language_code }}\nReferral: {{ $json.referrer_id ? 'Yes (from ' + $json.referrer_id + ')' : 'No' }}\nCreated at: {{ $json.created_at }}\nSupport topic ID: {{ $json.support_topic_id }}\n\nBalance: 0 🪙 \n\n@PocketSound_bot"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8c6b4696-82d2-4b62-b422-c2f9a3c71c81",
+      "name": "Notify admin about new user1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1904,
+        1088
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendPhoto",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Parse /start command').item.json.chat_id }}"
+            },
+            {
+              "name": "photo",
+              "value": "https://silver-perfect-barracuda-186.mypinata.cloud/ipfs/bafkreidjuficdk5vzzdga5xua2rjj657ka276jft4m4ootwag7227bxtny"
+            },
+            {
+              "name": "caption",
+              "value": "=⭐️ Welcome to Pocket Sound! ⭐️\n\n🎼 Telegram Based Sound App\n\n🎧 Your personal music library in Telegram\n\n• Send me audio files to save them\n• Search music by artist or song name\n• Create playlists (up to 3, 33 tracks each)\n• Share tracks with friends\n\n🔗 Your referral link:\n{{ $('Generate referral link1').item.json.referral_link }}\n\n🎁 Invite friends and get balance!\n\nOpen Menu to explore all features 🎧\n\n@PocketSound_bot"
+            },
+            {
+              "name": "reply_markup",
+              "value": "{\"inline_keyboard\":[[{\"text\":\"🎵 Open Menu\",\"callback_data\":\"/menu\"}]]}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f6fad237-c005-4359-b1fd-0585d0fae5cd",
+      "name": "Send welcome message to user1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2112,
+        1088
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=✅ User /start completed with referral ✅\n\nUser: @{{ $('Parse /start command').item.json.username }}\nTG ID: {{ $('Parse /start command').item.json.chat_id }}\n\nWelcome message sent. User is ready to use the bot."
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $('Get user data from DB1').item.json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0e756bc0-7f4c-4b4f-b24c-66904ce8ddc9",
+      "name": "Notify admin completion1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2336,
+        1088
+      ]
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2752,
+        1088
+      ],
+      "id": "8c8b4f22-2f7c-49af-855a-ea41e1b0bd7f",
+      "name": "No Operation, do nothing3"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/createForumTopic",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "name",
+              "value": "={{ $('Parse /start command').item.json.chat_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6d18c77b-0aee-4f3f-8497-3c4cac0b83fd",
+      "name": "Create support topic for new user",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        672,
+        1088
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE pocketsound_users \nSET balance_wallet = balance_wallet + {{ $('Code1').item.json.bonus_amount }}\nWHERE tg_id = {{ $('Code1').item.json.referrer_id }};",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2544,
+        1088
+      ],
+      "id": "97771ab0-e023-43ee-92e3-f4e06539da28",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Parse /start command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse /start command": {
+      "main": [
+        [
+          {
+            "node": "is it /start or ref start?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check user in DB": {
+      "main": [
+        [
+          {
+            "node": "User banned?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User banned?": {
+      "main": [
+        [
+          {
+            "node": "Send banned message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Admin dialog active?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Admin dialog active?": {
+      "main": [
+        [
+          {
+            "node": "Send admin mode message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "User exists in DB?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send banned message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about banned user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send admin mode message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about restart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User exists in DB?": {
+      "main": [
+        [
+          {
+            "node": "Send welcome back message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create support topic for user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create support topic for user": {
+      "main": [
+        [
+          {
+            "node": "Upsert user to DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert user to DB": {
+      "main": [
+        [
+          {
+            "node": "Generate referral link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate referral link": {
+      "main": [
+        [
+          {
+            "node": "Update referral link in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update referral link in DB": {
+      "main": [
+        [
+          {
+            "node": "Initialize coin balance (0)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initialize coin balance (0)": {
+      "main": [
+        [
+          {
+            "node": "Get user data from DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get user data from DB": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about new user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify admin about new user": {
+      "main": [
+        [
+          {
+            "node": "Send welcome message to user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send welcome message to user": {
+      "main": [
+        [
+          {
+            "node": "Notify admin completion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update existing user data": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send welcome back message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about existing user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify admin about existing user": {
+      "main": [
+        [
+          {
+            "node": "Update existing user data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify admin completion": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "is it /start or ref start?": {
+      "main": [
+        [
+          {
+            "node": "Check user in DB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check user in DB1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check user in DB1": {
+      "main": [
+        [
+          {
+            "node": "User banned?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User banned?1": {
+      "main": [
+        [
+          {
+            "node": "Send banned message1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Admin dialog active?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Admin dialog active?1": {
+      "main": [
+        [
+          {
+            "node": "Send admin mode message1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute a SQL query1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send banned message1": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about banned user1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send admin mode message1": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about restart1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query1": {
+      "main": [
+        [
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send self‑referral warning",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create support topic for new user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update existing user data1": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send self‑referral warning": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about user ref",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify admin about user ref": {
+      "main": [
+        [
+          {
+            "node": "Update existing user data1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert user to DB1": {
+      "main": [
+        [
+          {
+            "node": "Generate referral link1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate referral link1": {
+      "main": [
+        [
+          {
+            "node": "Update referral link in DB1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update referral link in DB1": {
+      "main": [
+        [
+          {
+            "node": "Initialize coin balance (0)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initialize coin balance (0)1": {
+      "main": [
+        [
+          {
+            "node": "Get user data from DB1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get user data from DB1": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about new user1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify admin about new user1": {
+      "main": [
+        [
+          {
+            "node": "Send welcome message to user1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send welcome message to user1": {
+      "main": [
+        [
+          {
+            "node": "Notify admin completion1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify admin completion1": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create support topic for new user": {
+      "main": [
+        [
+          {
+            "node": "Upsert user to DB1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2db11709-160d-4e24-9cb2-d17a53c61598",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "148b2b278c24b3c49bc4399db7e7ce15ed94f5b1044d28401c56f6ab511f0347"
+  },
+  "id": "IWraaz8MXvAzUM7B",
+  "tags": []
+}

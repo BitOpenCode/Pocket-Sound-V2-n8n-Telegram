@@ -1,0 +1,977 @@
+{
+  "name": "Handler: Playlist Add /r",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -784,
+        16
+      ],
+      "id": "972a5de5-83ff-42c5-9f0e-edecbfdcf67f",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body;\nconst callback = body.callback_query;\nconst message = callback.message;\nconst chatId = message.chat.id;\nconst messageId = message.message_id;\nconst from = callback.from;\nconst username = from.username || null;\nconst firstName = from.first_name || '';\nconst lastName = from.last_name || '';\nconst isPremium = from.is_premium || false;\nconst languageCode = from.language_code || 'en';\nconst callbackData = callback.data || '';\nconst parts = callbackData.split('|');\nconst action = parts[0];\nconst fileId = parts[1] ? Number(parts[1]) : null;\nconst playlistId = parts[2] ? Number(parts[2]) : null;\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    message_id: messageId,\n    username: username,\n    first_name: firstName,\n    last_name: lastName,\n    is_premium: isPremium,\n    language_code: languageCode,\n    callback_data: callbackData,\n    action: action,\n    file_id: fileId,\n    playlist_id: playlistId\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        16
+      ],
+      "id": "83d1e466-0c64-44f9-a288-0af61e26ba30",
+      "name": "Parse callback"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COUNT(*)::INTEGER AS track_exists\nFROM pocketsound_playlist_tracks\nWHERE playlist_id = {{ $('Parse Callback').first().json.playlist_id }}\n  AND file_id = {{ $('Parse Callback').first().json.file_id }};",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        880,
+        64
+      ],
+      "id": "e7e7e1c7-0bea-4958-9ecd-2d6fc2e356c8",
+      "name": "Track already in playlist and total count playlists",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH playlist_check AS (\n  SELECT id, name, user_id, created_at\n  FROM pocketsound_playlists\n  WHERE id = {{ $('Parse Callback').first().json.playlist_id }}\n    AND user_id = {{ $('Parse Callback').first().json.user_id }}\n),\n\ntrack_count AS (\n  SELECT COUNT(*)::INTEGER AS total_tracks\n  FROM pocketsound_playlist_tracks\n  WHERE playlist_id = {{ $('Parse Callback').first().json.playlist_id }}\n),\n\ntrack_exists_check AS (\n  SELECT COUNT(*)::INTEGER AS track_exists\n  FROM pocketsound_playlist_tracks\n  WHERE playlist_id = {{ $('Parse Callback').first().json.playlist_id }}\n    AND file_id = {{ $('Parse Callback').first().json.file_id }}\n)\n\nSELECT \n  (SELECT EXISTS(SELECT 1 FROM playlist_check)) AS playlist_exists,\n  (SELECT name FROM playlist_check LIMIT 1) AS playlist_name,\n  (SELECT total_tracks FROM track_count) AS total_tracks,\n  (SELECT track_exists FROM track_exists_check) AS track_exists,\n\n  (SELECT json_agg(json_build_object('id', id, 'name', name, 'created_at', created_at))\n   FROM pocketsound_playlists\n   WHERE user_id = {{ $('Parse Callback').first().json.user_id }}\n  ) AS user_playlists;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        464,
+        48
+      ],
+      "id": "adf27f34-0af5-42d0-84b8-3b361b5d3d8d",
+      "name": "Check Playlist Status",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "1716a899-2e80-47b8-8508-a90c10c6d753",
+              "leftValue": "={{ $json.total_tracks }}",
+              "rightValue": 33,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        640,
+        48
+      ],
+      "id": "a29e8eea-4647-4bbc-80c9-b873e91ea9b5",
+      "name": "Playlist Full?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "46504272-5233-458b-a712-c2b795e61110",
+              "leftValue": "={{ $json.track_exists }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1088,
+        64
+      ],
+      "id": "7adfc5e0-5a76-4968-a8af-f37eb1cdac7a",
+      "name": "Track not in Playlist?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO pocketsound_playlist_tracks (\n  playlist_id,\n  file_id,\n  position,\n  added_at\n)\nVALUES (\n  {{ $('Parse Callback').first().json.playlist_id }},\n  {{ $('Parse Callback').first().json.file_id }},\n  (SELECT COALESCE(MAX(position), 0) + 1 FROM pocketsound_playlist_tracks WHERE playlist_id = {{ $('Parse Callback').first().json.playlist_id }}),\n  NOW()\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1360,
+        -16
+      ],
+      "id": "e5e71fe6-6862-4f88-9945-8279dab39a34",
+      "name": "Add to playlist",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT name\nFROM pocketsound_playlists\nWHERE id = {{ $('Parse Callback').first().json.playlist_id }}\nLIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1568,
+        -16
+      ],
+      "id": "30e166ca-1b34-4476-90b0-aec69f7e7c17",
+      "name": "Get Playlist Name",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ \n  {\n    chat_id: $('Parse Callback').first().json.chat_id,\n    text: '✅ Track added to playlist!\\n\\n📂 Playlist: <b>' + $('Get Playlist Name').first().json.name + '</b>\\n🎵 Tracks: ' + ($('Check Playlist Status').first().json.total_tracks + 1) + '/33\\n\\n💡 You can add ' + (33 - $('Check Playlist Status').first().json.total_tracks - 1) + ' more tracks to this playlist\\n\\n@PocketSoundbot',\n    parse_mode: 'HTML',\n    reply_markup: {\n      inline_keyboard: [\n        [\n          {\n            text: '📂 My Playlists',\n            callback_data: '/myplaylist'\n          }\n        ],\n        [\n          {\n            text: '✏️ Edit Playlists',\n            callback_data: '/edit'\n          }\n        ],\n        [\n          {\n            text: '🔙 Back',\n            callback_data: '/menu'\n          }\n        ]\n      ]\n    }\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1776,
+        -16
+      ],
+      "id": "96da42f1-611e-4b13-b10e-b86f4e4d21df",
+      "name": "Send Message about Playlist"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=✅ User clicked Add To Playlist 🎉🎉🎉\n\nPlaylist: {{ $('Get Playlist Name').item.json.name }}\nTotal Tracks in Playlist: {{ $json.total_tracks }}/33\n\nUsername: @{{ $('Check user').item.json.tg_username }}\nFirst Name:{{ $('Check user').item.json.tg_first_name }} \nTGID: {{ $('Check user').item.json.tg_id }}\n"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $('Check user').item.json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2432,
+        -16
+      ],
+      "id": "909a8080-7d12-4a9b-81f1-71cc290d3579",
+      "name": "Передаем инфо/сообщение пользователя в группу поддержки25",
+      "notes": "Отправка сообщения пользователя в топик"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2624,
+        -16
+      ],
+      "id": "e5866a7f-443d-4669-965f-30050939812b",
+      "name": "No Operation, do nothing42"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COUNT(*)::INTEGER AS total_tracks\nFROM pocketsound_playlist_tracks\nWHERE playlist_id = {{ $('Parse Callback').first().json.playlist_id }};",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2224,
+        -16
+      ],
+      "id": "b75a21bf-10b4-4b35-9abb-9fbf410d64bb",
+      "name": "Get Updated Playlist Stats",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1792,
+        224
+      ],
+      "id": "6f69cda1-e787-4f98-a561-a5edeff1b0a3",
+      "name": "No Operation, do nothing43"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.chat_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -352,
+        16
+      ],
+      "id": "567691b1-867f-4279-ad04-4e39522ba16d",
+      "name": "Check user in DB",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "banned",
+              "leftValue": "={{ $json.is_banned }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -128,
+        16
+      ],
+      "id": "e601b615-7cf2-43b7-8254-ffd95a89b753",
+      "name": "User banned?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "admin",
+              "leftValue": "={{ $json.admin_active }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        80,
+        32
+      ],
+      "id": "c6208a0c-2597-4ade-862d-d658f46be19a",
+      "name": "Admin mode active?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=⛔️ You are banned from using this bot.\n\nContact support: @PocketSound_bot\n\n@PocketSound_bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -128,
+        -144
+      ],
+      "id": "94a1b7be-48ad-46f3-8cb1-0b0561d284b5",
+      "name": "Send banned message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=❄️ Admin mode is active. You cannot add tracks to playlists.\n\n@PocketSound_bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        80,
+        -144
+      ],
+      "id": "0ebb7abc-64b8-413b-ae7d-1b9aa8c573ce",
+      "name": "Send admin mode message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=⛔️ BANNED USER pressed Add to Playlist\n\nUser: @{{ $json.username }}\nTG ID: {{ $json.chat_id }}\nFile ID: {{ $json.file_id }}\n\nTo unban: /admin_false {{ $json.chat_id }}"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -128,
+        -304
+      ],
+      "id": "a15e1efb-1684-4cd7-b217-f5abc42640b3",
+      "name": "Notify admin about banned user"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔄 User pressed Add to Playlist (Admin mode ACTIVE)\n\nUser: @{{ $json.username }}\nTG ID: {{ $json.chat_id }}\nFile ID: {{ $json.file_id }}\n\n❄️ Admin dialog is active. User cannot add tracks."
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        80,
+        -304
+      ],
+      "id": "c33d424e-5fe9-4ee2-83c0-2166a0c0e004",
+      "name": "Notify admin about admin mode"
+    },
+    {
+      "parameters": {
+        "jsCode": "const callbackData = $('Parse callback').item.json;\nconst userData = $('Check user in DB').item.json;\n\nconst parts = callbackData.callback_data.split('|');\n\n\nif (parts.length === 2) {\n\n  return [{\n    json: {\n      playlist_id: null,\n      file_id: Number(parts[1]),\n      need_find_file: true,\n      chat_id: callbackData.chat_id,\n      message_id: callbackData.message_id,\n      username: callbackData.username,\n      first_name: callbackData.first_name,\n      user_id: userData.id  \n    }\n  }];\n}\n\nif (parts.length === 3) {\n  // Есть и playlist_id и file_id, можно добавлять\n  return [{\n    json: {\n      playlist_id: Number(parts[1]),\n      file_id: Number(parts[2]),\n      need_find_file: false,\n      chat_id: callbackData.chat_id,\n      message_id: callbackData.message_id,\n      username: callbackData.username,\n      first_name: callbackData.first_name,\n      user_id: userData.id  \n    }\n  }];\n}\n\nreturn [{\n  json: {\n    playlist_id: null,\n    file_id: null,\n    need_find_file: false,\n    error: true,\n    chat_id: callbackData.chat_id,\n    message_id: callbackData.message_id,\n    user_id: userData.id\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        48
+      ],
+      "id": "88bc2c90-eed7-427c-953c-13abe604a66c",
+      "name": "Parse Callback"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Admin mode active?').item.json.tg_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=⛔️ You already have 33 files in this playlist.\n\nChoose another one.\n\n@PocketSound_bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        -208
+      ],
+      "id": "a71c4d18-c377-42c3-b346-de7481b2d9ee",
+      "name": "Send already 33 tracks in playlist"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1280,
+        -208
+      ],
+      "id": "e572a0cf-6a87-486d-86b1-fcf1f9052bc8",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔡 User clicked Add To Playlist \n\nBut playlist is full ❌\n\nMessage from bot:\n{{ $json.result.text }}\n\n🔍📨"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $('Check user in DB').item.json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1088,
+        -208
+      ],
+      "id": "2b8d5a29-d240-45e6-83c2-cd5c9daa1670",
+      "name": "Send message to admin",
+      "notes": "Отправка сообщения пользователя в топик"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list",
+          "cachedResultName": "pocketsound_users"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.result.chat.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2000,
+        -16
+      ],
+      "id": "f99b7ccb-05a7-4f01-88bf-b687a76981b4",
+      "name": "Check user",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "Проверяем есть ли пользователь в DB"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Admin mode active?').item.json.tg_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=⛔️ You already have this track in the playlist.\n\nChoose other track or playlist.\n\n@PocketSound_bot"
+            },
+            {
+              "name": "reply_markup",
+              "value": "={{ JSON.stringify({ inline_keyboard: [[{ text: '🔙 Back to Playlist', callback_data: '/myplaylist' }]] }) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1360,
+        224
+      ],
+      "id": "28795898-8b55-4bc2-aa6f-c5d3fe12ad74",
+      "name": "Send already 33 tracks in playlist1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔡 User clicked Add To Playlist \n\nBut already have this track in the playlist ❌\n\nMessage from bot:\n{{ $json.result.text }}\n\n🔍📨"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $('Check user in DB').item.json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1568,
+        224
+      ],
+      "id": "e17a1bd4-7abc-4aee-8e76-a3af26f26e3e",
+      "name": "Send message to admin1",
+      "notes": "Отправка сообщения пользователя в топик"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Parse callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Track already in playlist and total count playlists": {
+      "main": [
+        [
+          {
+            "node": "Track not in Playlist?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Playlist Status": {
+      "main": [
+        [
+          {
+            "node": "Playlist Full?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Playlist Full?": {
+      "main": [
+        [
+          {
+            "node": "Send already 33 tracks in playlist",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Track already in playlist and total count playlists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Track not in Playlist?": {
+      "main": [
+        [
+          {
+            "node": "Add to playlist",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send already 33 tracks in playlist1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to playlist": {
+      "main": [
+        [
+          {
+            "node": "Get Playlist Name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Playlist Name": {
+      "main": [
+        [
+          {
+            "node": "Send Message about Playlist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Message about Playlist": {
+      "main": [
+        [
+          {
+            "node": "Check user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Передаем инфо/сообщение пользователя в группу поддержки25": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing42",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Updated Playlist Stats": {
+      "main": [
+        [
+          {
+            "node": "Передаем инфо/сообщение пользователя в группу поддержки25",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check user in DB": {
+      "main": [
+        [
+          {
+            "node": "User banned?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User banned?": {
+      "main": [
+        [
+          {
+            "node": "Send banned message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Admin mode active?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Admin mode active?": {
+      "main": [
+        [
+          {
+            "node": "Send admin mode message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Parse Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send banned message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about banned user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send admin mode message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about admin mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse callback": {
+      "main": [
+        [
+          {
+            "node": "Check user in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Callback": {
+      "main": [
+        [
+          {
+            "node": "Check Playlist Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send already 33 tracks in playlist": {
+      "main": [
+        [
+          {
+            "node": "Send message to admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message to admin": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check user": {
+      "main": [
+        [
+          {
+            "node": "Get Updated Playlist Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send already 33 tracks in playlist1": {
+      "main": [
+        [
+          {
+            "node": "Send message to admin1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message to admin1": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing43",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "6d8c28cf-4ca9-404b-9c30-40326d966336",
+  "meta": {
+    "instanceId": "148b2b278c24b3c49bc4399db7e7ce15ed94f5b1044d28401c56f6ab511f0347"
+  },
+  "id": "iTBan8XSkdt0OCZJ",
+  "tags": []
+}

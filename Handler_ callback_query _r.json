@@ -1,0 +1,1292 @@
+{
+  "name": "Handler: callback_query /r",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -768,
+        352
+      ],
+      "id": "8da9ae04-a197-4db0-af7c-4d8e158686b7",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body;\nconst callback = body.callback_query;\nconst message = callback.message;\nconst chatId = message.chat.id;\nconst messageId = message.message_id;\nconst username = message.chat.username || null;\nconst firstName = message.chat.first_name || '';\nconst lastName = message.chat.last_name || '';\nconst isPremium = callback.from?.is_premium || false;\nconst languageCode = callback.from?.language_code || 'en';\nconst callbackData = callback.data || '';\n\n// Parse callback data\nlet action = null;\nlet param1 = null;\nlet param2 = null;\n\nconst parts = callbackData.split('|');\naction = parts[0];\nparam1 = parts[1] || null;\nparam2 = parts[2] || null;\n\n// Determine handler type\nlet handlerType = 'unknown';\n\nif (action === 'get') {\n  handlerType = 'get_file';\n} else if (action === 'dz') {\n  handlerType = 'download_track';\n} else if (action === 'add_to_playlist') {\n  handlerType = 'add_to_playlist';\n} else if (action === 'playlist_view') {\n  handlerType = 'playlist_view';\n} else if (action === 'playlist_send_all') {\n  handlerType = 'playlist_send_all';\n} else if (action === 'more') {\n  handlerType = 'more_results';\n} else if (action === 'dzmore') {\n  handlerType = 'dzmore_results';\n} else if (action === 'playlist_add') {\n  handlerType = 'playlist_add';\n}\n\nreturn [{\n  json: {\n    handler_type: handlerType,\n    chat_id: chatId,\n    message_id: messageId,\n    username: username,\n    first_name: firstName,\n    last_name: lastName,\n    is_premium: isPremium,\n    language_code: languageCode,\n    callback_data: callbackData,\n    action: action,\n    param1: param1,\n    param2: param2\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -544,
+        352
+      ],
+      "id": "3aa50034-26d9-47e9-9f39-91fc481d77a0",
+      "name": "Parse callback data"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.chat_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -320,
+        352
+      ],
+      "id": "2bbfe4de-7df0-484b-a8e0-70add1ee477d",
+      "name": "Check user in DB",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-banned",
+              "leftValue": "={{ $json.is_banned }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -96,
+        352
+      ],
+      "id": "b78c251c-f44f-4810-aa3a-69d0b057c913",
+      "name": "User banned?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-admin",
+              "leftValue": "={{ $json.admin_active }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        128,
+        368
+      ],
+      "id": "030d1e30-1db6-4047-b857-d11827118d7c",
+      "name": "Admin mode active?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "⛔️ You are banned from using this bot.\n\nContact support: @PocketSound_bot\n\n@PocketSound_bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -96,
+        192
+      ],
+      "id": "bab7f415-2c8f-4fca-8b2a-a641e028ab42",
+      "name": "Send banned message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "❄️ Admin mode is active. You cannot use the bot.\n\n@PocketSound_bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        128,
+        192
+      ],
+      "id": "fdef8395-b288-47f1-9393-9bd6bf3c05f8",
+      "name": "Send admin mode message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "⛔️ BANNED USER PRESSED BUTTON ⛔️\n\nUser: @{{ $('Parse callback data').item.json.username }}\nTG ID: {{ $('Parse callback data').item.json.chat_id }}\nButton: {{ $('Parse callback data').item.json.callback_data }}\n\nTo unban: /admin_false {{ $('Parse callback data').item.json.chat_id }}"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -96,
+        32
+      ],
+      "id": "013f5a1a-e984-45b9-924c-9ed42917e5a2",
+      "name": "Notify admin about banned user"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "🔄 User pressed button (Admin mode ACTIVE)\n\nUser: @{{ $('Parse callback data').item.json.username }}\nTG ID: {{ $('Parse callback data').item.json.chat_id }}\nButton: {{ $('Parse callback data').item.json.callback_data }}\n\n❄️ Admin dialog is active. User cannot interact."
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        128,
+        32
+      ],
+      "id": "5df6d2c5-d178-4654-bd92-5510a19ac43f",
+      "name": "Notify admin about admin mode"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('When Executed by Another Workflow').item.json.body.callback_query.data }}",
+                    "rightValue": "get|",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    },
+                    "id": "route-get"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "get_file"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "route-dz",
+                    "leftValue": "={{ $('When Executed by Another Workflow').item.json.body.callback_query.data }}",
+                    "rightValue": "dz|",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "download_track"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "route-add",
+                    "leftValue": "={{ $('When Executed by Another Workflow').item.json.body.callback_query.data }}",
+                    "rightValue": "add_to_playlist|",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "add_to_playlist"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "route-view",
+                    "leftValue": "={{ $json.handler_type }}",
+                    "rightValue": "playlist_view",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "playlist_view"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "route-send-all",
+                    "leftValue": "={{ $json.handler_type }}",
+                    "rightValue": "playlist_send_all",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "playlist_send_all"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "route-more",
+                    "leftValue": "={{ $('When Executed by Another Workflow').item.json.body.callback_query.data }}",
+                    "rightValue": "more|",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "more_results"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "route-dzmore",
+                    "leftValue": "={{ $('When Executed by Another Workflow').item.json.body.callback_query.data }}",
+                    "rightValue": "dzmore|",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "dzmore_results"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "route-playlist-add",
+                    "leftValue": "={{ $('When Executed by Another Workflow').item.json.body.callback_query.data }}",
+                    "rightValue": "playlist_add|",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "playlist_add"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cd1774b1-7430-4760-86bc-2397acd60ee2",
+                    "leftValue": "={{ $('When Executed by Another Workflow').item.json.body.callback_query.data }}",
+                    "rightValue": "/soundsearch",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Music Mode selector"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "route-unknown",
+                    "leftValue": "={{ $json.handler_type }}",
+                    "rightValue": "unknown",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "unknown"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c938d8d8-28b6-4521-838c-f933065035d9",
+                    "leftValue": "={{ $('When Executed by Another Workflow').item.json.body.callback_query.data }}",
+                    "rightValue": "/deactivate",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Handler: /deactivate PRO Music Mode"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "43ce2a8a-c3d6-453c-9884-211d1a76e0b0",
+                    "leftValue": "={{ $('When Executed by Another Workflow').item.json.body.callback_query.data }}",
+                    "rightValue": "/pro_mode",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Handler: Activate PRO Music Mode"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        464,
+        224
+      ],
+      "id": "3a02d563-6bed-4eeb-853a-fddc417267bb",
+      "name": "Route to specific handler"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "dds2h41obxWvwXTG",
+          "mode": "list",
+          "cachedResultName": "Handler: get_file"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1504,
+        -768
+      ],
+      "id": "c7893607-f9c4-4565-a265-57dc3e915db2",
+      "name": "Handler: get_file"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "b3M0xJJUvE33i7YC",
+          "mode": "list",
+          "cachedResultName": "Handler: more_results"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1536,
+        32
+      ],
+      "id": "a47ea5dd-963b-4cd2-99df-6bceb45478f4",
+      "name": "Handler: more_results"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "gKfLxxhv4nOn0Yk7",
+          "mode": "list",
+          "cachedResultName": "Handler: dzmore_results"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1520,
+        192
+      ],
+      "id": "8d6f25a2-6cd7-4a59-aa37-eafd9c12e108",
+      "name": "Handler: dzmore_results"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Parse callback data').item.json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=❌ Unknown button. Please try again.\n\n@PocketSound_bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        336,
+        928
+      ],
+      "id": "b56c924d-51dc-48fb-80aa-fa5626a86f40",
+      "name": "Unknown button response"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=❓ Unknown button pressed\n\nUser: @{{ $('Parse callback data').item.json.username }}\nTG ID: {{ $('Parse callback data').item.json.chat_id }}\nButton: {{ $('Parse callback data').item.json.callback_data }}"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $('Check user in DB').item.json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        928
+      ],
+      "id": "7c15e540-9c00-43df-a094-735fb968d233",
+      "name": "Notify admin about unknown button"
+    },
+    {
+      "parameters": {
+        "jsCode": "const userData = $('Check user in DB').item.json;\nconst callbackData = $('Parse callback data').item.json;\n\nreturn [{\n  json: {\n    body: {\n      callback_query: {\n        data: callbackData.callback_data,\n        from: {\n          id: callbackData.chat_id,\n          is_bot: false,\n          first_name: callbackData.first_name,\n          username: callbackData.username,\n          language_code: callbackData.language_code,\n          is_premium: callbackData.is_premium\n        },\n        message: {\n          message_id: callbackData.message_id,\n          chat: {\n            id: callbackData.chat_id,\n            type: \"private\"\n          }\n        }\n      }\n    },\n    track_id: callbackData.param1,\n    chat_id: callbackData.chat_id,\n    user_id: userData.id,\n    support_topic_id: userData.support_topic_id\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1296,
+        -608
+      ],
+      "id": "f2b7e58e-88c6-444e-a658-ec45e11864bb",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "kNiZacNPYT7TvoSy",
+          "mode": "list",
+          "cachedResultName": "Handler: download_track"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "body": "={{ $json.body }}"
+          }
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1504,
+        -608
+      ],
+      "id": "a14a5222-39c5-41d7-a626-c5edc79a7e4c",
+      "name": "Handler: download_track"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "ebTgmHPRvHC0EJhU",
+          "mode": "list",
+          "cachedResultName": "Handler: music_mode_selector"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1296,
+        512
+      ],
+      "id": "cc531d41-6b87-4a7b-b19f-e16aa0cc41f9",
+      "name": "Handler: Music mode selector"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "RQIVT8H3U7kb7pgW",
+          "mode": "list",
+          "cachedResultName": "Handler: /deactivate PRO Music Mode"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1568,
+        672
+      ],
+      "id": "b3affbf8-f9ac-4bae-a5c5-5e2d650b4d47",
+      "name": "Handler: /deactivate PRO Music Mode"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "Wl2f0OvDsBlYp0RT",
+          "mode": "list",
+          "cachedResultName": "Handler: Activate PRO Music Mode"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1568,
+        832
+      ],
+      "id": "972504e9-2788-4cb6-97cf-492da0a6cf62",
+      "name": "Handler: Activate PRO Music Mode"
+    },
+    {
+      "parameters": {
+        "jsCode": "const userData = $('Check user in DB').item.json;\nconst callbackData = $('Parse callback data').item.json;\n\nreturn [{\n  json: {\n    body: {\n      callback_query: {\n        data: callbackData.callback_data,\n        from: {\n          id: callbackData.chat_id,\n          is_bot: false,\n          first_name: callbackData.first_name,\n          username: callbackData.username,\n          language_code: callbackData.language_code,\n          is_premium: callbackData.is_premium\n        },\n        message: {\n          message_id: callbackData.message_id,\n          chat: {\n            id: callbackData.chat_id,\n            type: \"private\"\n          }\n        }\n      }\n    },\n    chat_id: callbackData.chat_id,\n    user_id: userData.id,\n    support_topic_id: userData.support_topic_id\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1296,
+        672
+      ],
+      "id": "837ca064-0ec3-4e9c-b6dc-263c169072ef",
+      "name": "Data for /deactivate"
+    },
+    {
+      "parameters": {
+        "jsCode": "const userData = $('Check user in DB').item.json;\nconst callbackData = $('Parse callback data').item.json;\n\nreturn [{\n  json: {\n    body: {\n      callback_query: {\n        data: callbackData.callback_data,\n        from: {\n          id: callbackData.chat_id,\n          is_bot: false,\n          first_name: callbackData.first_name,\n          username: callbackData.username,\n          language_code: callbackData.language_code,\n          is_premium: callbackData.is_premium\n        },\n        message: {\n          message_id: callbackData.message_id,\n          chat: {\n            id: callbackData.chat_id,\n            type: \"private\"\n          }\n        }\n      }\n    },\n    chat_id: callbackData.chat_id,\n    user_id: userData.id,\n    support_topic_id: userData.support_topic_id\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1296,
+        832
+      ],
+      "id": "939224e6-9e86-4077-87cc-8a880869b496",
+      "name": "Data for /deactivate1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const userData = $('Check user in DB').item.json;\nconst callbackData = $('Parse callback data').item.json;\n\nreturn [{\n  json: {\n    body: {\n      callback_query: {\n        data: callbackData.callback_data,\n        from: {\n          id: callbackData.chat_id,\n          is_bot: false,\n          first_name: callbackData.first_name,\n          username: callbackData.username,\n          language_code: callbackData.language_code,\n          is_premium: callbackData.is_premium\n        },\n        message: {\n          message_id: callbackData.message_id,\n          chat: {\n            id: callbackData.chat_id,\n            type: \"private\"\n          }\n        }\n      }\n    },\n    query: callbackData.param1, \n    page: parseInt(callbackData.param2) || 1,  \n    chat_id: callbackData.chat_id,\n    user_id: userData.id,\n    support_topic_id: userData.support_topic_id\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1312,
+        32
+      ],
+      "id": "4c333f08-d213-41a5-8a91-1483b75c7c32",
+      "name": "Data for /more results"
+    },
+    {
+      "parameters": {
+        "jsCode": "const userData = $('Check user in DB').item.json;\nconst callbackData = $('Parse callback data').item.json;\n\nreturn [{\n  json: {\n    body: {\n      callback_query: {\n        data: callbackData.callback_data,\n        from: {\n          id: callbackData.chat_id,\n          is_bot: false,\n          first_name: callbackData.first_name,\n          username: callbackData.username,\n          language_code: callbackData.language_code,\n          is_premium: callbackData.is_premium\n        },\n        message: {\n          message_id: callbackData.message_id,\n          chat: {\n            id: callbackData.chat_id,\n            type: \"private\"\n          }\n        }\n      }\n    },\n    query: callbackData.param1, \n    page: parseInt(callbackData.param2) || 1,  \n    chat_id: callbackData.chat_id,\n    user_id: userData.id,\n    support_topic_id: userData.support_topic_id\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1312,
+        192
+      ],
+      "id": "3cfaba76-fad3-4ca2-b673-41e80c5d41c9",
+      "name": "Data for /dzmore results"
+    },
+    {
+      "parameters": {
+        "jsCode": "const userData = $('Check user in DB').item.json;\nconst callbackData = $('Parse callback data').item.json;\n\nreturn [{\n  json: {\n    body: {\n      callback_query: {\n        data: callbackData.callback_data,\n        from: {\n          id: callbackData.chat_id,\n          is_bot: false,\n          first_name: callbackData.first_name,\n          username: callbackData.username,\n          language_code: callbackData.language_code,\n          is_premium: callbackData.is_premium\n        },\n        message: {\n          message_id: callbackData.message_id,\n          chat: {\n            id: callbackData.chat_id,\n            type: \"private\"\n          }\n        }\n      }\n    },\n    query: callbackData.param1, \n    page: parseInt(callbackData.param2) || 1,  \n    chat_id: callbackData.chat_id,\n    user_id: userData.id,\n    support_topic_id: userData.support_topic_id\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1296,
+        -400
+      ],
+      "id": "4a19677f-3eb2-4b54-9960-d4e5556fe1a6",
+      "name": "Data for add_to_playlist"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "u0WvMyrtlf9mDDHm",
+          "mode": "list",
+          "cachedResultName": "Handler: add_to_playlist"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1504,
+        -400
+      ],
+      "id": "c88e0bfd-1f8b-4f70-9937-1050cb6ba7af",
+      "name": "Handler: add_to_playlist"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "Qp9SbwhXYbQSyVPo",
+          "mode": "list",
+          "cachedResultName": "Handler: View Playlist"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1312,
+        -176
+      ],
+      "id": "5910aa68-bb26-4445-a751-2613f4b96079",
+      "name": "Handler: View Playlist"
+    },
+    {
+      "parameters": {
+        "jsCode": "const userData = $('Check user in DB').item.json;\nconst callbackData = $('Parse callback data').item.json;\n\nreturn [{\n  json: {\n    body: {\n      callback_query: {\n        data: callbackData.callback_data,\n        from: {\n          id: callbackData.chat_id,\n          is_bot: false,\n          first_name: callbackData.first_name,\n          username: callbackData.username,\n          language_code: callbackData.language_code,\n          is_premium: callbackData.is_premium\n        },\n        message: {\n          message_id: callbackData.message_id,\n          chat: {\n            id: callbackData.chat_id,\n            type: \"private\"\n          }\n        }\n      }\n    },\n    query: callbackData.param1, \n    page: parseInt(callbackData.param2) || 1,  \n    chat_id: callbackData.chat_id,\n    user_id: userData.id,\n    support_topic_id: userData.support_topic_id\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1312,
+        368
+      ],
+      "id": "e05981e2-f3ad-48cf-aebf-920c379afc6f",
+      "name": "Data for Playlist add"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "E5sELYlxEaPil8zC",
+          "mode": "list",
+          "cachedResultName": "Handler: Playlist Add"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1520,
+        368
+      ],
+      "id": "4a8a8613-083f-4884-a770-83c55a78c2a0",
+      "name": "Handler: Playlist Add"
+    },
+    {
+      "parameters": {
+        "jsCode": "const userData = $('Check user in DB').item.json;\nconst callbackData = $('Parse callback data').item.json;\n\nreturn [{\n  json: {\n    body: {\n      callback_query: {\n        data: callbackData.callback_data,\n        from: {\n          id: callbackData.chat_id,\n          is_bot: false,\n          first_name: callbackData.first_name,\n          username: callbackData.username,\n          language_code: callbackData.language_code,\n          is_premium: callbackData.is_premium\n        },\n        message: {\n          message_id: callbackData.message_id,\n          chat: {\n            id: callbackData.chat_id,\n            type: \"private\"\n          }\n        }\n      }\n    },\n    query: callbackData.param1, \n    page: parseInt(callbackData.param2) || 1,  \n    chat_id: callbackData.chat_id,\n    user_id: userData.id,\n    support_topic_id: userData.support_topic_id\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1296,
+        -768
+      ],
+      "id": "e07b8fb9-a2d3-4476-b41b-c7039a7231c9",
+      "name": "Data get file"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Parse callback data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse callback data": {
+      "main": [
+        [
+          {
+            "node": "Check user in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check user in DB": {
+      "main": [
+        [
+          {
+            "node": "User banned?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User banned?": {
+      "main": [
+        [
+          {
+            "node": "Send banned message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Admin mode active?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Admin mode active?": {
+      "main": [
+        [
+          {
+            "node": "Send admin mode message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Route to specific handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send banned message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about banned user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send admin mode message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about admin mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route to specific handler": {
+      "main": [
+        [
+          {
+            "node": "Data get file",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Data for add_to_playlist",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handler: View Playlist",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [],
+        [
+          {
+            "node": "Data for /more results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Data for /dzmore results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Data for Playlist add",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handler: Music mode selector",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unknown button response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Data for /deactivate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Data for /deactivate1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unknown button response": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about unknown button",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Handler: download_track",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data for /deactivate": {
+      "main": [
+        [
+          {
+            "node": "Handler: /deactivate PRO Music Mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data for /deactivate1": {
+      "main": [
+        [
+          {
+            "node": "Handler: Activate PRO Music Mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data for /more results": {
+      "main": [
+        [
+          {
+            "node": "Handler: more_results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data for /dzmore results": {
+      "main": [
+        [
+          {
+            "node": "Handler: dzmore_results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data for add_to_playlist": {
+      "main": [
+        [
+          {
+            "node": "Handler: add_to_playlist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data for Playlist add": {
+      "main": [
+        [
+          {
+            "node": "Handler: Playlist Add",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data get file": {
+      "main": [
+        [
+          {
+            "node": "Handler: get_file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2491583c-940b-4cc3-b7f1-7344a643af98",
+  "meta": {
+    "instanceId": "148b2b278c24b3c49bc4399db7e7ce15ed94f5b1044d28401c56f6ab511f0347"
+  },
+  "id": "LUHKyi36F1YzH7Re",
+  "tags": []
+}

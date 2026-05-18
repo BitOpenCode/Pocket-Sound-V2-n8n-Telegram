@@ -1,0 +1,670 @@
+{
+  "name": "PocketSound PostgreSQL /r",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE pocketsound_creators (\n  id BIGSERIAL PRIMARY KEY,\n\n  user_id BIGINT UNIQUE\n    REFERENCES pocketsound_users(id)\n    ON DELETE CASCADE,\n\n  bio TEXT,\n  verified BOOLEAN DEFAULT FALSE,\n\n  total_views INT DEFAULT 0,\n  total_files INT DEFAULT 0,\n\n  created_at TIMESTAMP DEFAULT NOW()\n);\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -128,
+        1312
+      ],
+      "id": "a3de9f5a-70d8-4edd-8672-6b3d8f1b3c86",
+      "name": "7. Creators",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE pocketsound_ads (\n  id BIGSERIAL PRIMARY KEY,\n\n  advertiser_user_id BIGINT\n    REFERENCES pocketsound_users(id)\n    ON DELETE CASCADE,\n\n  ad_type VARCHAR(32),\n  target_category VARCHAR(64),\n\n  budget NUMERIC(12, 4),\n  spent NUMERIC(12, 4) DEFAULT 0,\n\n  starts_at TIMESTAMP,\n  ends_at TIMESTAMP,\n\n  created_at TIMESTAMP DEFAULT NOW()\n);\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -128,
+        1760
+      ],
+      "id": "8ce244d9-e9b0-479f-af93-3835836b5d9d",
+      "name": "9. Ads",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE pocketsound_transactions (\n  id BIGSERIAL PRIMARY KEY,\n\n  user_id BIGINT\n    REFERENCES pocketsound_users(id)\n    ON DELETE CASCADE,\n\n  tx_type VARCHAR(32),\n  amount NUMERIC(12, 4),\n\n  metadata JSONB,\n\n  created_at TIMESTAMP DEFAULT NOW()\n);\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -128,
+        2192
+      ],
+      "id": "9a2b4442-d349-49ca-9fa5-dcd196182308",
+      "name": "11. Transactions (Stars / Gifts)",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE pocketsound_streams (\n  id BIGSERIAL PRIMARY KEY,\n\n  creator_id BIGINT\n    REFERENCES pocketsound_creators(id)\n    ON DELETE CASCADE,\n\n  tg_chat_id BIGINT,\n  message_id INT,\n\n  is_live BOOLEAN DEFAULT FALSE,\n  duration INT,\n\n  viewers INT DEFAULT 0,\n  saved_to_profile BOOLEAN DEFAULT FALSE,\n\n  created_at TIMESTAMP DEFAULT NOW()\n);\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -128,
+        2416
+      ],
+      "id": "4a4a80ce-11c7-4758-a3d1-0a5324897d3d",
+      "name": "12. Streams (Live / VOD)",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "ALTER TABLE pocketsound_users ALTER COLUMN tg_id DROP NOT NULL;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -112,
+        3408
+      ],
+      "id": "39ce8bf1-a0f2-493f-947e-9eb5ae4a4a59",
+      "name": "Add tg_add NULL for web users",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE pocketsound_users (\n  id BIGSERIAL PRIMARY KEY,\n\n  tg_id BIGINT UNIQUE NOT NULL,\n  tg_username VARCHAR(64),\n  tg_first_name VARCHAR(128),\n  tg_last_name VARCHAR(128),\n  photo_url TEXT,\n\n  premium BOOLEAN DEFAULT FALSE,\n  language_code VARCHAR(8),\n\n  balance_stars NUMERIC(12, 4) DEFAULT 0,\n  balance_wallet NUMERIC(12, 4) DEFAULT 0,\n\n  user_role VARCHAR(32) DEFAULT 'user',\n  is_bot BOOLEAN DEFAULT FALSE,\n\n  last_active_at TIMESTAMP,\n  created_at TIMESTAMP DEFAULT NOW(),\n  updated_at TIMESTAMP DEFAULT NOW()\n);\n\nCREATE INDEX idx_pocketsound_users_tg_id\n  ON pocketsound_users (tg_id);\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -128,
+        16
+      ],
+      "id": "195cdc16-74ab-4cef-997a-9ca9dc84e652",
+      "name": "1. pocketsound_users",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE pocketsound_tg_chats (\n  id BIGSERIAL PRIMARY KEY,\n\n  tg_chat_id BIGINT UNIQUE NOT NULL,\n  chat_type VARCHAR(32),\n  title VARCHAR(255),\n  username VARCHAR(64),\n\n  is_public BOOLEAN DEFAULT FALSE,\n  is_indexable BOOLEAN DEFAULT TRUE,\n\n  created_at TIMESTAMP DEFAULT NOW()\n);\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -128,
+        224
+      ],
+      "id": "0bb8fef4-4e13-4ee3-bce4-a5a92c82692e",
+      "name": "2. pocketsound_tg_chats",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE pocketsound_files (\n  id BIGSERIAL PRIMARY KEY,\n\n  owner_user_id BIGINT\n    REFERENCES pocketsound_users(id)\n    ON DELETE SET NULL,\n\n  tg_chat_id BIGINT\n    REFERENCES pocketsound_tg_chats(tg_chat_id)\n    ON DELETE CASCADE,\n\n  message_id INT NOT NULL,\n\n  file_unique_id VARCHAR(255) UNIQUE,\n  file_type VARCHAR(32),\n  mime_type VARCHAR(128),\n\n  title VARCHAR(255),\n  artist VARCHAR(255),\n  album VARCHAR(255),\n  file_name VARCHAR(255),\n\n  duration INT,\n  file_size BIGINT,\n\n  is_public BOOLEAN DEFAULT TRUE,\n  is_searchable BOOLEAN DEFAULT TRUE,\n\n  uploaded_at TIMESTAMP,\n  created_at TIMESTAMP DEFAULT NOW()\n);\n\nCREATE INDEX idx_pocketsound_files_message\n  ON pocketsound_files (tg_chat_id, message_id);\n\nCREATE INDEX idx_pocketsound_files_searchable\n  ON pocketsound_files (is_searchable);\n\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -128,
+        448
+      ],
+      "id": "2f93b56b-3884-4a44-a628-10eba9429cf7",
+      "name": "3. pocketsound_files (Telegram storage)",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE pocketsound_file_search_index (\n  id BIGSERIAL PRIMARY KEY,\n\n  file_id BIGINT\n    REFERENCES pocketsound_files(id)\n    ON DELETE CASCADE,\n\n  search_text TEXT NOT NULL,\n  normalized_text TEXT NOT NULL,\n\n  created_at TIMESTAMP DEFAULT NOW()\n);\n\nCREATE INDEX idx_pocketsound_search_normalized\n  ON pocketsound_file_search_index\n  USING GIN (to_tsvector('simple', normalized_text));\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -128,
+        672
+      ],
+      "id": "d13fc356-3357-455f-adeb-d6e7e1e8d331",
+      "name": "4. pocketsound_file_search_index",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE pocketsound_search_queries (\n  id BIGSERIAL PRIMARY KEY,\n\n  user_id BIGINT\n    REFERENCES pocketsound_users(id)\n    ON DELETE CASCADE,\n\n  query_text TEXT NOT NULL,\n  results_count INT,\n\n  created_at TIMESTAMP DEFAULT NOW()\n);\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -128,
+        880
+      ],
+      "id": "0e6a83a7-4b71-4a5e-9c38-54164e32efe4",
+      "name": "5. pocketsound_search_queries",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE pocketsound_file_shares (\n  id BIGSERIAL PRIMARY KEY,\n\n  file_id BIGINT\n    REFERENCES pocketsound_files(id)\n    ON DELETE CASCADE,\n\n  from_user_id BIGINT\n    REFERENCES pocketsound_users(id),\n\n  to_user_id BIGINT\n    REFERENCES pocketsound_users(id),\n\n  share_type VARCHAR(32),\n\n  created_at TIMESTAMP DEFAULT NOW()\n);\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -128,
+        1088
+      ],
+      "id": "25320bae-cb0f-46fb-bbf5-622cbd3bcd89",
+      "name": "6. pocketsound_file_shares",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE pocketsound_stories (\n  id BIGSERIAL PRIMARY KEY,\n\n  creator_id BIGINT\n    REFERENCES pocketsound_creators(id)\n    ON DELETE CASCADE,\n\n  tg_chat_id BIGINT,\n  message_id INT,\n\n  story_type VARCHAR(32),\n  category VARCHAR(64),\n\n  views INT DEFAULT 0,\n  expires_at TIMESTAMP,\n\n  created_at TIMESTAMP DEFAULT NOW()\n);\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -128,
+        1520
+      ],
+      "id": "e90397f8-0288-4bf6-bd50-b9b5ae541657",
+      "name": "8. Stories (pocketsound_stories)",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE pocketsound_ad_stories (\n  id BIGSERIAL PRIMARY KEY,\n\n  ad_id BIGINT\n    REFERENCES pocketsound_ads(id)\n    ON DELETE CASCADE,\n\n  story_id BIGINT\n    REFERENCES pocketsound_stories(id)\n    ON DELETE CASCADE\n);\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -128,
+        2000
+      ],
+      "id": "c144dac8-8f74-469e-9b18-cddf970caf2d",
+      "name": "10.  Ads ↔ Stories",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "ALTER TABLE pocketsound_users\nADD COLUMN is_banned BOOLEAN DEFAULT FALSE;\n\nALTER TABLE pocketsound_users\nADD COLUMN ban_reason TEXT;\n\nALTER TABLE pocketsound_users\nADD COLUMN banned_at TIMESTAMP;\n\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        112,
+        16
+      ],
+      "id": "2951f27c-80b3-4dfd-8cb2-d76e6130a804",
+      "name": "13. pocketsound_users - is_banned",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "ALTER TABLE pocketsound_users\nADD COLUMN support_topic_id BIGINT;\n\nCREATE INDEX idx_pocketsound_users_topic\nON pocketsound_users(support_topic_id);\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        336,
+        16
+      ],
+      "id": "d017daa8-4664-4653-b7ac-ea385a411b42",
+      "name": "14.  pocketsound_users support_topic_id",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE pocketsound_playlists (\n  id BIGSERIAL PRIMARY KEY,\n  \n  user_id BIGINT NOT NULL\n    REFERENCES pocketsound_users(id)\n    ON DELETE CASCADE,\n  \n  name VARCHAR(100) NOT NULL,\n  description TEXT,\n  \n  is_public BOOLEAN DEFAULT FALSE,\n  \n  created_at TIMESTAMP DEFAULT NOW(),\n  updated_at TIMESTAMP DEFAULT NOW()\n);\n\n-- Индекс для поиска плейлистов пользователя\nCREATE INDEX idx_playlists_user_id \n  ON pocketsound_playlists(user_id);\n\n-- Индекс для публичных плейлистов\nCREATE INDEX idx_playlists_public \n  ON pocketsound_playlists(is_public) \n  WHERE is_public = TRUE;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        864,
+        32
+      ],
+      "id": "8b8082b3-56c4-4be8-b849-d36522155237",
+      "name": "15: pocketsound_playlists",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE pocketsound_playlist_tracks (\n  id BIGSERIAL PRIMARY KEY,\n  \n  playlist_id BIGINT NOT NULL\n    REFERENCES pocketsound_playlists(id)\n    ON DELETE CASCADE,\n  \n  file_id BIGINT NOT NULL\n    REFERENCES pocketsound_files(id)\n    ON DELETE CASCADE,\n  \n  position INTEGER NOT NULL,\n  added_at TIMESTAMP DEFAULT NOW(),\n  \n  -- Один файл = один раз в плейлисте\n  UNIQUE(playlist_id, file_id)\n);\n\n-- Индекс для выборки треков плейлиста\nCREATE INDEX idx_playlist_tracks_playlist \n  ON pocketsound_playlist_tracks(playlist_id);\n\n-- Индекс для сортировки по позиции\nCREATE INDEX idx_playlist_tracks_position \n  ON pocketsound_playlist_tracks(playlist_id, position);\n\n-- Индекс для поиска \"в каких плейлистах этот файл\"\nCREATE INDEX idx_playlist_tracks_file \n  ON pocketsound_playlist_tracks(file_id);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1072,
+        32
+      ],
+      "id": "11bd3c24-9689-44f9-8607-8aa3fdbf9237",
+      "name": "16: pocketsound_playlist_tracks",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE pocketsound_user_limits (\n  user_id BIGINT PRIMARY KEY\n    REFERENCES pocketsound_users(id)\n    ON DELETE CASCADE,\n  \n  max_playlists INTEGER DEFAULT 3,\n  extra_playlists_purchased INTEGER DEFAULT 0,\n  \n  max_tracks_per_playlist INTEGER DEFAULT 33,\n  extra_slots_purchased INTEGER DEFAULT 0,\n  \n  created_at TIMESTAMP DEFAULT NOW(),\n  updated_at TIMESTAMP DEFAULT NOW()\n);\n\n-- Индекс для быстрой проверки лимитов\nCREATE INDEX idx_user_limits_user_id \n  ON pocketsound_user_limits(user_id);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1280,
+        32
+      ],
+      "id": "5ad317c4-8a6a-411d-973b-5b0242627192",
+      "name": "17: pocketsound_user_limits",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE pocketsound_user_states (\n  user_id BIGINT PRIMARY KEY\n    REFERENCES pocketsound_users(id)\n    ON DELETE CASCADE,\n  \n  current_state VARCHAR(64),\n  state_data JSONB,\n  state_started_at TIMESTAMP,\n  \n  created_at TIMESTAMP DEFAULT NOW(),\n  updated_at TIMESTAMP DEFAULT NOW()\n);\n\nCREATE INDEX idx_user_states_user_id \n  ON pocketsound_user_states(user_id);\n\nCREATE INDEX idx_user_states_state \n  ON pocketsound_user_states(current_state);\n\nCREATE INDEX idx_user_states_active \n  ON pocketsound_user_states(user_id, current_state)\n  WHERE current_state IS NOT NULL;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1728,
+        48
+      ],
+      "id": "aef37ab7-0271-429b-8a0e-22bd27c3ed0d",
+      "name": "18: User States (pocketsound_user_states) Playlists",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE pocketsound_credentials (\n    id BIGSERIAL PRIMARY KEY,\n    user_id BIGINT NOT NULL REFERENCES pocketsound_users(id) ON DELETE CASCADE,\n    login VARCHAR(255) UNIQUE NOT NULL,\n    password_hash VARCHAR(256) NOT NULL,\n    last_login TIMESTAMP,\n    login_attempts INTEGER DEFAULT 0,\n    is_locked BOOLEAN DEFAULT FALSE,\n    password_changed_at TIMESTAMP DEFAULT NOW(),\n    created_at TIMESTAMP DEFAULT NOW(),\n    updated_at TIMESTAMP DEFAULT NOW()\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1952,
+        48
+      ],
+      "id": "4c8ea533-7541-48ea-a7a8-eb607fdc626f",
+      "name": "19: pocketsound_credentials",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE pocketsound_auth_codes (\n    id BIGSERIAL PRIMARY KEY,\n    user_id BIGINT NOT NULL REFERENCES pocketsound_users(id) ON DELETE CASCADE,\n    code_type VARCHAR(20) NOT NULL,  -- 'confirmation', 'reset'\n    code VARCHAR(10) NOT NULL,\n    expires_at TIMESTAMP NOT NULL,\n    is_used BOOLEAN DEFAULT FALSE,\n    used_at TIMESTAMP,\n    ip_address INET,\n    created_at TIMESTAMP DEFAULT NOW()\n);\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -112,
+        2992
+      ],
+      "id": "e345cbe0-724a-4767-9b45-9d0d6a27d8ec",
+      "name": "MiniApp 20: pocketsound_auth_codes",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE pocketsound_sessions (\n    id BIGSERIAL PRIMARY KEY,\n    user_id BIGINT NOT NULL REFERENCES pocketsound_users(id) ON DELETE CASCADE,\n    refresh_token VARCHAR(512) UNIQUE NOT NULL,\n    expires_at TIMESTAMP NOT NULL,\n    ip_address INET,\n    user_agent TEXT,\n    created_at TIMESTAMP DEFAULT NOW()\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        96,
+        2992
+      ],
+      "id": "66f3f682-94f3-4dad-bf61-dc833f913e50",
+      "name": "MiniApp 21: pocketsound_sessions",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "ALTER TABLE pocketsound_users \nADD COLUMN email VARCHAR(255) UNIQUE,\nADD COLUMN phone VARCHAR(20),\nADD COLUMN is_email_confirmed BOOLEAN DEFAULT FALSE;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -112,
+        3200
+      ],
+      "id": "95072b24-52a3-4969-9ba0-de169b9da973",
+      "name": "MiniApp pocketsound_users",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE INDEX idx_credentials_login ON pocketsound_credentials(login);\nCREATE INDEX idx_credentials_user_id ON pocketsound_credentials(user_id);\nCREATE INDEX idx_auth_codes_user_id ON pocketsound_auth_codes(user_id);\nCREATE INDEX idx_auth_codes_code ON pocketsound_auth_codes(code);\nCREATE INDEX idx_auth_codes_expires ON pocketsound_auth_codes(expires_at);\nCREATE INDEX idx_auth_codes_type ON pocketsound_auth_codes(code_type);\nCREATE INDEX idx_sessions_user_id ON pocketsound_sessions(user_id);\nCREATE INDEX idx_sessions_refresh_token ON pocketsound_sessions(refresh_token);\nCREATE INDEX idx_sessions_expires ON pocketsound_sessions(expires_at);\nCREATE INDEX idx_users_email ON pocketsound_users(email);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        96,
+        3200
+      ],
+      "id": "9261b891-4e86-408e-838e-08251bffefff",
+      "name": "MiniApp idx",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE pocketsound_playlist_deezer_tracks (\n    id BIGSERIAL PRIMARY KEY,\n    playlist_id BIGINT NOT NULL,\n    deezer_id BIGINT NOT NULL,\n    added_at TIMESTAMP DEFAULT NOW(),\n    CONSTRAINT fk_playlist_deezer_playlist\n        FOREIGN KEY (playlist_id)\n        REFERENCES pocketsound_playlists(id)\n        ON DELETE CASCADE,\n    UNIQUE(playlist_id, deezer_id)\n);\n\nCREATE TABLE pocketsound_user_likes (\n    user_id BIGINT NOT NULL,\n    deezer_id BIGINT NOT NULL,\n    liked_at TIMESTAMP DEFAULT NOW(),\n    PRIMARY KEY (user_id, deezer_id),\n    CONSTRAINT fk_user_likes_user\n        FOREIGN KEY (user_id)\n        REFERENCES pocketsound_users(id)\n        ON DELETE CASCADE\n);\n\nCREATE TABLE pocketsound_user_history (\n    id BIGSERIAL PRIMARY KEY,\n    user_id BIGINT NOT NULL,\n    deezer_id BIGINT NOT NULL,\n    listened_at TIMESTAMP DEFAULT NOW(),\n    CONSTRAINT fk_user_history_user\n        FOREIGN KEY (user_id)\n        REFERENCES pocketsound_users(id)\n        ON DELETE CASCADE\n);\n\n-- Индексы для производительности\nCREATE INDEX idx_playlist_deezer_tracks_playlist_id\n    ON pocketsound_playlist_deezer_tracks(playlist_id);\n\nCREATE INDEX idx_playlist_deezer_tracks_deezer_id\n    ON pocketsound_playlist_deezer_tracks(deezer_id);\n\nCREATE INDEX idx_user_likes_user_id\n    ON pocketsound_user_likes(user_id);\n\nCREATE INDEX idx_user_likes_deezer_id\n    ON pocketsound_user_likes(deezer_id);\n\nCREATE INDEX idx_user_history_user_id\n    ON pocketsound_user_history(user_id);\n\nCREATE INDEX idx_user_history_deezer_id\n    ON pocketsound_user_history(deezer_id);\n\nCREATE INDEX idx_user_history_listened_at\n    ON pocketsound_user_history(listened_at DESC);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        96,
+        3408
+      ],
+      "id": "692c3891-c377-44d5-b2e6-e8b90f7f718b",
+      "name": "Soc. MiniApp",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "ALTER TABLE pocketsound_users\nADD COLUMN IF NOT EXISTS referrer_id BIGINT,\nADD COLUMN IF NOT EXISTS referral_link TEXT;\n\nCREATE INDEX IF NOT EXISTS idx_pocketsound_users_referrer_id\nON pocketsound_users(referrer_id);\n\nCOMMENT ON COLUMN pocketsound_users.referrer_id IS 'User ID who invited this user';\nCOMMENT ON COLUMN pocketsound_users.referral_link IS 'User personal referral link to invite others';\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2304,
+        48
+      ],
+      "id": "3537fbf1-7972-4237-8094-b7caf8ff28ef",
+      "name": "22: Add referral fields to pocketsound_users",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "ALTER TABLE pocketsound_users\nADD COLUMN admin_active BOOLEAN DEFAULT FALSE;\n\nCOMMENT ON COLUMN pocketsound_users.admin_active IS 'Admin mode active - user cannot use bot commands';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2528,
+        48
+      ],
+      "id": "1693e78a-4cc3-4662-9c68-1644be4e8ed6",
+      "name": "23: Admin Active (temp freeze user)",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE pocketsound_download_queue (\n  id BIGSERIAL PRIMARY KEY,\n  \n  user_id BIGINT NOT NULL\n    REFERENCES pocketsound_users(id)\n    ON DELETE CASCADE,\n  \n  chat_id BIGINT NOT NULL,\n  track_id VARCHAR(64) NOT NULL,\n  stream_url TEXT NOT NULL,\n  output_path VARCHAR(255) NOT NULL,\n  support_topic_id BIGINT,\n  \n  status VARCHAR(20) DEFAULT 'pending',\n  -- pending → processing → done / failed\n  \n  error_message TEXT,\n  \n  created_at TIMESTAMP DEFAULT NOW(),\n  started_at TIMESTAMP,\n  finished_at TIMESTAMP\n);\n\nCREATE INDEX idx_download_queue_status\n  ON pocketsound_download_queue(status);\n\nCREATE INDEX idx_download_queue_user\n  ON pocketsound_download_queue(user_id);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1200,
+        752
+      ],
+      "id": "56270825-acbb-42de-9a19-b7ebe8f095c3",
+      "name": "pocketsound_download_queue",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "Один пользователь может иметь несколько задач в очереди."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "ALTER TABLE pocketsound_download_queue\nADD COLUMN track_title VARCHAR(255),\nADD COLUMN track_artist VARCHAR(255),\nADD COLUMN deezer_track_id BIGINT,\nADD COLUMN songlink_youtube_url TEXT,\nADD COLUMN cover_url TEXT,\nADD COLUMN file_unique_id VARCHAR(255),\nADD COLUMN message_id BIGINT;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1456,
+        752
+      ],
+      "id": "39ee810f-c813-474b-8783-023644fa8dd8",
+      "name": "pocketsound_download_queue ADD COLUMN",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "добавить еще поля \nчтобы знать кто из какого чата\nк какому сообщению относится очередь\n\nтак сработает триггер на сервна нужный процесс"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "ALTER TABLE pocketsound_download_queue ADD COLUMN sent_to_user BOOLEAN DEFAULT FALSE;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1696,
+        752
+      ],
+      "id": "e02db8d6-7a0e-4784-a8b9-4c872413310a",
+      "name": "pocketsound_download_queue sent_to_user",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "ALTER TABLE pocketsound_download_queue ADD COLUMN locked_at TIMESTAMP;\nALTER TABLE pocketsound_download_queue ADD COLUMN locked_by TEXT;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1936,
+        752
+      ],
+      "id": "5bd4eedc-5847-4c3c-b148-27cdc50a8121",
+      "name": "pocketsound_download_queue ADD COLUMN locked_at",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "18e395c6-73bf-4a1a-b3fe-b40e06b50752",
+  "meta": {
+    "instanceId": "148b2b278c24b3c49bc4399db7e7ce15ed94f5b1044d28401c56f6ab511f0347"
+  },
+  "id": "gT6stYsLqSiGvCjo",
+  "tags": []
+}

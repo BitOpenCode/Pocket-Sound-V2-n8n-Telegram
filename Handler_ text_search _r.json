@@ -1,0 +1,1947 @@
+{
+  "name": "Handler: text_search /r",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -832,
+        288
+      ],
+      "id": "7df9ced4-d5c7-4957-9443-bcf19fd1773d",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body;\nlet chatId = null;\nlet messageId = null;\nlet username = null;\nlet firstName = null;\nlet lastName = null;\nlet isPremium = false;\nlet languageCode = 'en';\nlet searchText = null;\n\nif (body.message) {\n  const message = body.message;\n  chatId = message.chat.id;\n  messageId = message.message_id;\n  username = message.chat.username || null;\n  firstName = message.chat.first_name || '';\n  lastName = message.chat.last_name || '';\n  isPremium = message.from?.is_premium || false;\n  languageCode = message.from?.language_code || 'en';\n  searchText = message.text || '';\n}\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    message_id: messageId,\n    username: username,\n    first_name: firstName,\n    last_name: lastName,\n    is_premium: isPremium,\n    language_code: languageCode,\n    search_text: searchText\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -608,
+        288
+      ],
+      "id": "3ab115b4-2398-4183-8994-340d175e63f6",
+      "name": "Parse search command"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.chat_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -384,
+        288
+      ],
+      "id": "3cbdc0d1-525b-4185-8e85-272efdb8d9e3",
+      "name": "Check user in DB",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-banned",
+              "leftValue": "={{ $json.is_banned }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -160,
+        288
+      ],
+      "id": "2f13ec99-215a-4e92-b08d-5541c1a1baf0",
+      "name": "User banned?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-admin",
+              "leftValue": "={{ $json.admin_active }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        64,
+        304
+      ],
+      "id": "e59cc932-68b4-4384-96cc-ba085309c348",
+      "name": "Admin mode active?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "⛔️ You are banned from using this bot.\n\nContact support: @PocketSound_bot\n\n@PocketSound_bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -160,
+        128
+      ],
+      "id": "b9bc0f1b-5c2b-49f9-8d26-10b3bcd24972",
+      "name": "Send banned message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "❄️ Admin mode is active. You cannot search music.\n\n@PocketSound_bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        64,
+        128
+      ],
+      "id": "f5d44880-b4ad-470e-b7b0-2a3243a9ef7a",
+      "name": "Send admin mode message"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  current_state,\n  split_part(current_state, '|', 2) AS mode,\n  NULLIF(split_part(current_state, '|', 3), '')::INTEGER AS playlist_id,\n  EXTRACT(EPOCH FROM (NOW() - state_started_at)) AS seconds_elapsed\nFROM pocketsound_user_states\nWHERE user_id = {{ $('Check user in DB').first().json.id }}\n  AND current_state LIKE 'awaiting_playlist_name|%'\n  AND state_started_at > NOW() - INTERVAL '10 minutes'\nLIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        288,
+        320
+      ],
+      "id": "34cec7a5-bc06-49e0-9b07-4fe5721af47e",
+      "name": "Check if user is creating playlist",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-state",
+              "leftValue": "={{ $json.current_state }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        512,
+        320
+      ],
+      "id": "de0166f8-fdbe-4cf9-b339-2525bcdd4498",
+      "name": "Has playlist state?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=⛔️ BANNED USER TRIED TO SEARCH ⛔️\n\nUser: @{{ $('Parse search command').item.json.username }}\nTG ID: {{ $('Parse search command').item.json.chat_id }}\nSearch text: {{ $('Parse search command').item.json.search_text }}\nBan reason: {{ $json.ban_reason || 'N/A' }}\n\nTo unban: /admin_false {{ $('Parse search command').item.json.chat_id }}"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -160,
+        -48
+      ],
+      "id": "6bf598af-77e7-4c8c-98e2-02b08d4db50c",
+      "name": "Notify admin about banned user"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔄 User tried to search (Admin mode ACTIVE)\n\nUser: @{{ $('Parse search command').item.json.username }}\nTG ID: {{ $('Parse search command').item.json.chat_id }}\nSearch text: {{ $('Parse search command').item.json.search_text }}\n\n❄️ Admin dialog is active. User cannot search."
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        64,
+        -48
+      ],
+      "id": "0b3159cd-444b-474e-8f07-f72051d7e959",
+      "name": "Notify admin about admin mode"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO pocketsound_playlists (user_id, name, created_at)\nVALUES (\n  {{ $('Check user in DB').first().json.id }},\n  '{{ $('Parse search command').first().json.search_text }}',\n  NOW()\n)\nRETURNING id, name;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1216,
+        176
+      ],
+      "id": "64d76386-c8fb-4b58-aedf-f400643354b4",
+      "name": "Create Playlist",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE pocketsound_user_states\nSET \n  current_state = NULL,\n  state_data = NULL,\n  updated_at = NOW()\nWHERE user_id = {{ $('Check user in DB').first().json.id }};",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1440,
+        176
+      ],
+      "id": "bf4732da-e491-4255-ba4a-0ed584b1f5f4",
+      "name": "Clear User State",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2304,
+        176
+      ],
+      "id": "99f3b58a-ab83-4438-8b0d-d54dc5071b34",
+      "name": "No Operation, do nothing36"
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first()?.json || {};\nconst parsedData = $('Parse search command').first().json;\nconst rawName = (parsedData.search_text || '').trim();\nconst seconds = Number(row.seconds_elapsed || 0);\n\nif (!row.current_state) {\n  return [{ json: { action: 'none' } }];\n}\n\nif (!rawName) {\n  return [{ json: { action: 'invalid_name', reason: 'empty' } }];\n}\n\nif (seconds > 600) {\n  return [{\n    json: {\n      action: 'expired',\n      mode: row.mode || null,\n      playlist_id: row.playlist_id || null\n    }\n  }];\n}\n\nif (row.mode === 'rename') {\n  return [{\n    json: {\n      action: 'rename',\n      playlist_id: Number(row.playlist_id),\n      new_name: rawName\n    }\n  }];\n}\n\nif (row.mode === 'create') {\n  return [{\n    json: {\n      action: 'create',\n      new_name: rawName\n    }\n  }];\n}\n\nreturn [{ json: { action: 'none' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        784,
+        96
+      ],
+      "id": "77b6bf1d-f554-4058-80ee-6b1a00ed64ee",
+      "name": "Code name rename"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "rename",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "5367fe31-e1f6-4209-990c-a08b17af20a2"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Rename"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "b936b2bc-2a89-489e-a79f-df6fea15b76c",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "create",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Name"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        976,
+        96
+      ],
+      "id": "9975dcc0-f264-45a1-b2f0-38a18d8e75e2",
+      "name": "R or N"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE pocketsound_playlists\nSET\n  name = '{{ $json.new_name.replace(/'/g, \"''\") }}',\n  updated_at = NOW()\nWHERE id = {{ $json.playlist_id }}\nRETURNING id, name, updated_at;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1216,
+        -16
+      ],
+      "id": "62f1e9f8-a880-4c53-9382-13da4c29f293",
+      "name": "Rename",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE pocketsound_user_states\nSET \n  current_state = NULL,\n  state_started_at = NULL,\n  updated_at = NOW()\nWHERE user_id = {{ $('Check user in DB').first().json.id }};",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1424,
+        -16
+      ],
+      "id": "7901fdb6-21e5-4ab5-8b8d-9117ae2816f4",
+      "name": "Clear rename State",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2272,
+        -16
+      ],
+      "id": "d0807399-06ad-4c82-b3b9-cbdf500dc644",
+      "name": "No Operation, do nothing52"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🎧♻️ User Renamed Playlist! 🎧♻️\n\nReceived message: {{ $('Send Rename Done').item.json.result.text }}\n\nUsername: @{{ $json.tg_username }}\nFirst Name: {{ $json.tg_first_name }}\nTGID: {{ $json.tg_id }}\n\n🎧♻️ 🎧♻️ 🎧♻️"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2048,
+        -16
+      ],
+      "id": "cc7e85ed-d708-42ee-b194-63e502741126",
+      "name": "Send message user renamed playlist",
+      "notes": "Отправка сообщения пользователя в топик"
+    },
+    {
+      "parameters": {
+        "jsCode": "const parsedData = $('Parse search command').first().json;\nconst searchText = parsedData.search_text || '';\nconst words = searchText.split(' ').map(w => w.toLowerCase());\nconst condition = words.map(w => `LOWER(s.normalized_text) ILIKE '%${w}%'`).join(' OR ');\nreturn [{ json: { sql_condition: condition } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        672
+      ],
+      "id": "472d9d33-a3cc-44dc-9ed5-c95e7cd100a9",
+      "name": "Code1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b18c7445-8d2d-4684-8e66-3b5b2913db4b",
+              "leftValue": "={{ $json.music_api_mode }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        976,
+        544
+      ],
+      "id": "4467d4ca-8ffb-422a-9d8f-d9cc1639dd39",
+      "name": "API Mode"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": {{ $json.chat_id }},\n  \"reply_to_message_id\": {{ $json.reply_to_message_id }},\n  \"text\": \"Music:\",\n  \"reply_markup\": {{ JSON.stringify($json.reply_markup) }}\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1904,
+        432
+      ],
+      "id": "67b33f1f-0b51-4457-a58a-310793ce4a47",
+      "name": "Send API Buttons",
+      "notes": "Отправка сообщения пользователя в топик"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.deezer.com/search?q={{ $json.search_query }}&index=0&limit=25",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1424,
+        432
+      ],
+      "id": "d288b28e-f6a1-4ae4-bbfe-3e93336178d4",
+      "name": "Deezer"
+    },
+    {
+      "parameters": {
+        "jsCode": "const deezerData = $input.first().json;\nconst tracks = deezerData.data;\nconst total = deezerData.total;\nconst parsedData = $('Parse search command').first().json;\n\nif (!tracks || tracks.length === 0) {\n  return [{\n    json: {\n      chat_id: parsedData.chat_id,\n      reply_to_message_id: parsedData.message_id,\n      text: `❌ Nothing found: <b>${parsedData.search_text}</b>\\n\\n💡 Try:\\n• Artist name only\\n• Song title only\\n• Different spelling`,\n      parse_mode: 'HTML'\n    }\n  }];\n}\n\nconst chatId = parsedData.chat_id;\nconst replyToMessageId = parsedData.message_id;\nconst query = parsedData.search_text;\nconst offset = 0;\n\nconst photo = tracks[0]?.album?.cover_big\n  || tracks[0]?.album?.cover_medium\n  || '';\n\nconst displayTracks = tracks.slice(0, 10);\n\nconst inline_keyboard = displayTracks.map(track => ([\n  {\n    text: `🎵 ${track.title} — ${track.artist.name}`,\n    callback_data: `dz|${track.id}`\n  }\n]));\n\nif (offset + 10 < total) {\n  inline_keyboard.push([\n    {\n      text: `More… (${offset + 10}/${total})`,\n      callback_data: `dzmore|${query}|${offset + 10}`\n    }\n  ]);\n}\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    reply_to_message_id: replyToMessageId,\n    photo: photo,\n    caption: `🔍 Search results for: <b>${query}</b>`,\n    parse_mode: 'HTML',\n    reply_markup: { inline_keyboard }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1648,
+        432
+      ],
+      "id": "81c56990-1654-445f-95de-ec92d6add0a1",
+      "name": "Buttons"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔎 User found songs through API MODE!\n♻️ ♻️ ♻️ ♻️ ♻️\n\nid: {{ $json.id }}\n\ntg_id: {{ $json.tg_id }}\n\nuser can choose songs from the list:\n\n{{ $('Send API Buttons').item.json.result.reply_markup.inline_keyboard[0][0].text }}\n\n{{ $('Send API Buttons').item.json.result.reply_markup.inline_keyboard[1][0].text }}\n\n{{ $('Send API Buttons').item.json.result.reply_markup.inline_keyboard[2][0].text }}\n\n{{ $('Send API Buttons').item.json.result.reply_markup.inline_keyboard[3][0].text }}\n\n{{ $('Send API Buttons').item.json.result.reply_markup.inline_keyboard[4][0].text }}\n\n{{ $('Send API Buttons').item.json.result.reply_markup.inline_keyboard[5][0].text }}\n\n{{ $('Send API Buttons').item.json.result.reply_markup.inline_keyboard[6][0].text }}\n\n{{ $('Send API Buttons').item.json.result.reply_markup.inline_keyboard[7][0].text }}\n\n{{ $('Send API Buttons').item.json.result.reply_markup.inline_keyboard[8][0].text }}\n♻️ ♻️ ♻️ ♻️ ♻️\n🔎 🔎 🔎 🔎 🔎"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2352,
+        432
+      ],
+      "id": "24d4475d-89ea-4d2b-920f-3bf29da69182",
+      "name": "Control Group Message",
+      "notes": "Отправка сообщения пользователя в топик"
+    },
+    {
+      "parameters": {
+        "jsCode": "const searchText = $('Parse search command').first().json.search_text || '';\nconst cleanQuery = searchText\n  .replace(/[^\\w\\s\\u0400-\\u04FF-]/gi, ' ')\n  .replace(/\\s+/g, ' ')\n  .trim();\n\nreturn [{\n  json: {\n    search_query: encodeURIComponent(cleanQuery)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        432
+      ],
+      "id": "5f6c1f74-0dc0-40e6-82cd-29360f2399ab",
+      "name": "Deezer  Norm text"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2592,
+        432
+      ],
+      "id": "fb27176f-415e-4a81-b314-5aa9e64a0f38",
+      "name": "No Operation, do nothing11"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list",
+          "cachedResultName": "pocketsound_users"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.result.chat.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2128,
+        432
+      ],
+      "id": "7087fa17-c9bb-45b1-84d6-2ab7c2dfc668",
+      "name": "Check user in DB Postg",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "Проверяем есть ли пользователь в DB"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Check user in DB').first().json.tg_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=✅ Playlist \"{{ $('Create Playlist').first().json.name }}\" created!\n\nNow you can add tracks to your playlist. Use search or forward tracks from your Telegram Profile.\n\n• Up to 33 tracks per playlist\n\n@PocketSound_bot"
+            },
+            {
+              "name": "reply_markup",
+              "value": "{\"inline_keyboard\":[[{\"text\":\"📂 My Playlists\",\"callback_data\":\"/myplaylist\"}]]}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1632,
+        176
+      ],
+      "id": "567fc5ce-2ac0-4a0d-af0a-f8d9519829b9",
+      "name": "Send Playlist Name Created"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list",
+          "cachedResultName": "pocketsound_users"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.result.chat.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1856,
+        176
+      ],
+      "id": "ec3477e5-16e8-47dd-829e-850a0ba87f44",
+      "name": "user DB info",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "Проверяем есть ли пользователь в DB"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Check user in DB').first().json.tg_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=✅ Playlist renamed!\nNew Name: \"{{ $('Rename').item.json.name }}\"\n\nAdd tracks to your playlist. Use search or forward tracks from your Telegram Profile.\n\n• Up to 33 tracks per playlist\n\n@PocketSound_bot"
+            },
+            {
+              "name": "reply_markup",
+              "value": "{\"inline_keyboard\":[[{\"text\":\"📂 My Playlists\",\"callback_data\":\"/myplaylist\"}]]}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1632,
+        -16
+      ],
+      "id": "b50833ac-c8cd-4e45-a23d-674d7fd437c6",
+      "name": "Send Rename Done"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list",
+          "cachedResultName": "pocketsound_users"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.result.chat.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1824,
+        -16
+      ],
+      "id": "d8e33423-bd58-480d-9530-7831e30e6635",
+      "name": "user check in DB",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "Проверяем есть ли пользователь в DB"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list",
+          "cachedResultName": "pocketsound_users"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $('User banned?').item.json.tg_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        800,
+        544
+      ],
+      "id": "672c4094-bf0c-45e2-9dd7-c62e39ef31d0",
+      "name": "check user DB",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      },
+      "notes": "Проверяем есть ли пользователь в DB"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT DISTINCT ON (LOWER(f.title), LOWER(f.artist))\n  f.id,\n  f.title,\n  f.artist,\n  f.tg_chat_id,\n  f.message_id\nFROM pocketsound_file_search_index s\nJOIN pocketsound_files f ON f.id = s.file_id\nWHERE f.is_searchable = true\n  AND ({{ $json.sql_condition }})\nORDER BY LOWER(f.title), LOWER(f.artist), f.created_at DESC\nLIMIT 10;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1424,
+        672
+      ],
+      "id": "40f555bf-c319-4b72-88fc-d250c5a8c5ed",
+      "name": "Search Music Files in DB",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const files = $input.all().map(item => item.json);\nconst parsedData = $('Parse search command').first().json;\nconst chatId = parsedData.chat_id;\nconst replyToMessageId = parsedData.message_id;\nconst query = parsedData.search_text || '';\n\nconst pageSize = 8;\nconst offset = Number($json.offset || 0);\nconst filesPage = files.slice(offset, offset + pageSize);\n\nconst inline_keyboard = filesPage.map(file => ([\n  {\n    text: `${file.title} — ${file.artist}`,\n    callback_data: `get|${file.id}`\n  }\n]));\n\nif (offset + filesPage.length < files.length) {\n  inline_keyboard.push([\n    {\n      text: 'More…',\n      callback_data: `more|${query}|${offset + filesPage.length}`\n    }\n  ]);\n}\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    reply_to_message_id: replyToMessageId,\n    text: `🔎 Search results for: \"${query}\"\\n\\nSelect a track:\\n\\n@PocketSound_bot`,\n    reply_markup: { inline_keyboard }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1936,
+        656
+      ],
+      "id": "643cb7f2-55f3-4212-b524-35ce197fcee8",
+      "name": "Format results with buttons"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    chat_id: $json.chat_id,\n    reply_to_message_id: $json.reply_to_message_id,\n    text: $json.text,\n    reply_markup: $json.reply_markup\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2224,
+        656
+      ],
+      "id": "5a1ebbda-763b-4b79-bb9a-2f6758aadedb",
+      "name": "Send search results to user"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔎 User searched: \"{{ $json.query_text }}\"\n\nUsername: @{{ $('Check user in DB1').item.json.tg_username }}\nTGID: {{ $('Check user in DB1').item.json.tg_id }}\nResults found: {{ $input.all().length }}\n\nPro Mode: {{ $('Check user in DB1').item.json.music_api_mode }}\n\n@PocketSound_bot"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $('Check user in DB').item.json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2960,
+        864
+      ],
+      "id": "df8d01c8-772a-445b-928c-c74ff07caee7",
+      "name": "Notify admin about search"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_search_queries",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_id": "={{ $('Check user in DB1').item.json.id }}",
+            "query_text": "={{ $('Parse search command').first().json.search_text }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "query_text",
+              "displayName": "query_text",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "results_count",
+              "displayName": "results_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "last_sent_file_id",
+              "displayName": "last_sent_file_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2736,
+        864
+      ],
+      "id": "800c0648-21ad-4893-80e1-e573a9498b55",
+      "name": "Save search query to history",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        3200,
+        864
+      ],
+      "id": "c0a8849b-2591-494f-bc34-cd0b1a947afb",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {
+        "jsCode": "const parsedData = $('Parse search command').first().json;\nconst chatId = parsedData.chat_id;\nconst replyToMessageId = parsedData.message_id;\nconst query = parsedData.search_text || '';\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    reply_to_message_id: replyToMessageId,\n    text: `❌ No results found for: \"${query}\"\\n\\n💡 Try:\\n• Artist name only\\n• Song title only\\n• Different spelling\\n\\n🎵 Want more results? Activate Music Mode!\\n\\n@PocketSound_bot`,\n    reply_markup: {\n      inline_keyboard: [\n        [\n          {\n            text: \"🎵 Activate Music Mode\",\n            callback_data: \"/soundsearch\"\n          }\n        ]\n      ]\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        864
+      ],
+      "id": "dee4bdae-e7a0-46f5-ba2a-642a87fb192d",
+      "name": "No results message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    chat_id: $json.chat_id,\n    reply_to_message_id: $json.reply_to_message_id,\n    text: $json.text,\n    reply_markup: $json.reply_markup\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2224,
+        864
+      ],
+      "id": "81a39616-9b39-40ff-8d84-ccd68e781b46",
+      "name": "Send no results message"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.result.chat.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2496,
+        864
+      ],
+      "id": "8f16eba7-afc4-4644-be4d-680b73fbbb77",
+      "name": "Check user in DB1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.result.chat.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2496,
+        656
+      ],
+      "id": "5c4a916a-1b79-4381-a490-87dd3a06042e",
+      "name": "Check user in DB2",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔎 User searched: \"{{ $json.query_text }}\"\n\nUsername: @{{ $('Check user in DB2').item.json.tg_username }}\nTGID: {{ $('Check user in DB2').item.json.tg_id }}\n\nPro Mode: {{ $('Check user in DB2').item.json.music_api_mode }}\n@PocketSound_bot"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $('Check user in DB2').item.json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2960,
+        656
+      ],
+      "id": "c5714dec-78e6-444d-956c-14b4f6532580",
+      "name": "Notify admin about search1"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_search_queries",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_id": "={{ $('Check user in DB2').item.json.id }}",
+            "query_text": "={{ $('Parse search command').first().json.search_text }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "query_text",
+              "displayName": "query_text",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "results_count",
+              "displayName": "results_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "last_sent_file_id",
+              "displayName": "last_sent_file_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2736,
+        656
+      ],
+      "id": "ebc9a9de-c1c1-4650-b4d2-9de3c2921755",
+      "name": "Save search query to history1",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        3200,
+        656
+      ],
+      "id": "dd319e19-c13c-43b5-a187-0ff5c7c98cf5",
+      "name": "No Operation, do nothing1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-1003381734836"
+            },
+            {
+              "name": "text",
+              "value": "=🎧 User created Playlist! 🎧\nName of Playlist: {{ $('Create Playlist').item.json.name }}\n\nUsername: @{{ $json.tg_username }}\nFirst Name: {{ $json.tg_first_name }}\nTGID: {{ $json.tg_id }}\n\n🎧 🎧 🎧"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2080,
+        176
+      ],
+      "id": "dc1790b3-3915-42cd-92de-ce3a856f6d9c",
+      "name": "Send message to admin",
+      "notes": "Отправка сообщения пользователя в топик"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-results",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1664,
+        672
+      ],
+      "id": "64cbf6c1-f917-497b-8358-66e9ce27770f",
+      "name": "Has results?"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Parse search command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse search command": {
+      "main": [
+        [
+          {
+            "node": "Check user in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check user in DB": {
+      "main": [
+        [
+          {
+            "node": "User banned?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User banned?": {
+      "main": [
+        [
+          {
+            "node": "Send banned message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Admin mode active?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Admin mode active?": {
+      "main": [
+        [
+          {
+            "node": "Send admin mode message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check if user is creating playlist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send banned message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about banned user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send admin mode message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about admin mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if user is creating playlist": {
+      "main": [
+        [
+          {
+            "node": "Has playlist state?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has playlist state?": {
+      "main": [
+        [
+          {
+            "node": "Code name rename",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "check user DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Playlist": {
+      "main": [
+        [
+          {
+            "node": "Clear User State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear User State": {
+      "main": [
+        [
+          {
+            "node": "Send Playlist Name Created",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code name rename": {
+      "main": [
+        [
+          {
+            "node": "R or N",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "R or N": {
+      "main": [
+        [
+          {
+            "node": "Rename",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Playlist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rename": {
+      "main": [
+        [
+          {
+            "node": "Clear rename State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear rename State": {
+      "main": [
+        [
+          {
+            "node": "Send Rename Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message user renamed playlist": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing52",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code1": {
+      "main": [
+        [
+          {
+            "node": "Search Music Files in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Mode": {
+      "main": [
+        [
+          {
+            "node": "Deezer  Norm text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send API Buttons": {
+      "main": [
+        [
+          {
+            "node": "Check user in DB Postg",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deezer": {
+      "main": [
+        [
+          {
+            "node": "Buttons",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buttons": {
+      "main": [
+        [
+          {
+            "node": "Send API Buttons",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Control Group Message": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing11",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deezer  Norm text": {
+      "main": [
+        [
+          {
+            "node": "Deezer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check user in DB Postg": {
+      "main": [
+        [
+          {
+            "node": "Control Group Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Playlist Name Created": {
+      "main": [
+        [
+          {
+            "node": "user DB info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "user DB info": {
+      "main": [
+        [
+          {
+            "node": "Send message to admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Rename Done": {
+      "main": [
+        [
+          {
+            "node": "user check in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "user check in DB": {
+      "main": [
+        [
+          {
+            "node": "Send message user renamed playlist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check user DB": {
+      "main": [
+        [
+          {
+            "node": "API Mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Music Files in DB": {
+      "main": [
+        [
+          {
+            "node": "Has results?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format results with buttons": {
+      "main": [
+        [
+          {
+            "node": "Send search results to user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send search results to user": {
+      "main": [
+        [
+          {
+            "node": "Check user in DB2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save search query to history": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify admin about search": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No results message": {
+      "main": [
+        [
+          {
+            "node": "Send no results message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send no results message": {
+      "main": [
+        [
+          {
+            "node": "Check user in DB1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check user in DB1": {
+      "main": [
+        [
+          {
+            "node": "Save search query to history",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify admin about search1": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save search query to history1": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about search1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check user in DB2": {
+      "main": [
+        [
+          {
+            "node": "Save search query to history1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message to admin": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing36",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has results?": {
+      "main": [
+        [
+          {
+            "node": "Format results with buttons",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No results message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e19fc5d5-e160-4d5f-82af-9bbb11bc1e85",
+  "meta": {
+    "instanceId": "148b2b278c24b3c49bc4399db7e7ce15ed94f5b1044d28401c56f6ab511f0347"
+  },
+  "id": "d72UjxeAwae0T8BN",
+  "tags": []
+}

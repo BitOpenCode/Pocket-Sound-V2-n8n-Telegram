@@ -1,0 +1,478 @@
+{
+  "name": "Handler: get_file /r",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -768,
+        336
+      ],
+      "id": "d4302ee1-6775-4406-bd25-999d8452db8f",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body;\nconst callback = body.callback_query;\nconst message = callback.message;\nconst chatId = message.chat.id;\nconst messageId = message.message_id;\nconst from = callback.from;  \nconst username = from.username || null;\nconst firstName = from.first_name || '';\nconst lastName = from.last_name || '';\nconst isPremium = from.is_premium || false;\nconst languageCode = from.language_code || 'en';\nconst callbackData = callback.data || '';\n\n// Parse get|file_id\nconst parts = callbackData.split('|');\nconst fileId = parts[1];\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    message_id: messageId,\n    username: username,\n    first_name: firstName,\n    last_name: lastName,\n    is_premium: isPremium,\n    language_code: languageCode,\n    file_id: fileId,\n    callback_data: callbackData\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -544,
+        336
+      ],
+      "id": "79c4b7f6-4144-42ce-8abe-874623432c3c",
+      "name": "Parse get_file callback"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.chat_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -320,
+        336
+      ],
+      "id": "24c1aab8-19b8-46e5-8d9d-8e03e4f643f7",
+      "name": "Check user in DB",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-banned",
+              "leftValue": "={{ $json.is_banned }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -96,
+        336
+      ],
+      "id": "066baf25-9e35-44e0-911f-411b09aa9d1f",
+      "name": "User banned?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-admin",
+              "leftValue": "={{ $json.admin_active }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        128,
+        352
+      ],
+      "id": "ca69fc8c-546e-40a3-8822-0edd7aea21f9",
+      "name": "Admin mode active?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=⛔️ You are banned from using this bot.\n\nContact support: @PocketSound_bot\n\n/support\n@PocketSound_bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -96,
+        176
+      ],
+      "id": "2028bf23-3748-4c39-ba35-0f9370951b2e",
+      "name": "Send banned message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=❄️ Admin mode is active. You cannot use the bot.\n\n@PocketSound_bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        128,
+        176
+      ],
+      "id": "8287527e-79bf-4b69-af47-336d9d5181e4",
+      "name": "Send admin mode message"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT tg_chat_id, message_id FROM pocketsound_files WHERE id = {{ $json.file_id }}  LIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        592,
+        368
+      ],
+      "id": "d5212997-267a-4709-b6f9-8df41298d0d6",
+      "name": "Get file location",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/copyMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": {{ $('Parse get_file callback').item.json.chat_id }},\n  \"from_chat_id\": {{ $json.tg_chat_id }},\n  \"message_id\": {{ $json.message_id }},\n  \"caption\": \"@PocketSound_bot\",\n  \"reply_markup\": {\n    \"inline_keyboard\": [\n      [\n        {\n          \"text\": \"➕ Add to Playlist\",\n          \"callback_data\": \"add_to_playlist|{{ $('Parse get_file callback').item.json.file_id }}\"\n        }\n      ]\n    ]\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        816,
+        368
+      ],
+      "id": "d8150b45-ac45-4a07-877a-df4b2573946a",
+      "name": "Copy file to user"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=📁 User requested file\n\nUser: @{{ $('Parse get_file callback').item.json.username }}\nTG ID: {{ $('Parse get_file callback').item.json.chat_id }}\nFile ID: {{ $('Parse get_file callback').item.json.file_id }}\n\nFile sent successfully."
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $('Check user in DB').item.json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1040,
+        368
+      ],
+      "id": "5f688cdc-c030-414e-b754-2e4bdbb038b9",
+      "name": "Notify admin"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=⛔️ BANNED USER REQUESTED FILE ⛔️\n\nUser: @{{ $('Parse get_file callback').item.json.username }}\nTG ID: {{ $('Parse get_file callback').item.json.chat_id }}\nFile ID: {{ $('Parse get_file callback').item.json.file_id }}\n\nTo unban: /admin_false {{ $('Parse get_file callback').item.json.chat_id }}"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -96,
+        0
+      ],
+      "id": "7f9f200d-d4a3-4e72-b206-abfa98da0b86",
+      "name": "Notify admin about banned user"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=🔄 User requested file (Admin mode ACTIVE)\n\nUser: @{{ $('Parse get_file callback').item.json.username }}\nTG ID: {{ $('Parse get_file callback').item.json.chat_id }}\nFile ID: {{ $('Parse get_file callback').item.json.file_id }}\n\n❄️ Admin dialog is active. Request ignored."
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        128,
+        0
+      ],
+      "id": "b8a1bd2c-e938-4f22-9442-74390b79f868",
+      "name": "Notify admin about admin mode"
+    },
+    {
+      "parameters": {
+        "jsCode": "const callbackData = $('Parse get_file callback').item.json;\nconst userData = $('Check user in DB').item.json;\n\nconst parts = callbackData.callback_data.split('|');\n\n\nif (parts.length === 2) {\n\n  return [{\n    json: {\n      playlist_id: null,\n      file_id: Number(parts[1]),\n      need_find_file: true,\n      chat_id: callbackData.chat_id,\n      message_id: callbackData.message_id,\n      username: callbackData.username,\n      first_name: callbackData.first_name,\n      user_id: userData.id  \n    }\n  }];\n}\n\nif (parts.length === 3) {\n  \n  return [{\n    json: {\n      playlist_id: Number(parts[1]),\n      file_id: Number(parts[2]),\n      need_find_file: false,\n      chat_id: callbackData.chat_id,\n      message_id: callbackData.message_id,\n      username: callbackData.username,\n      first_name: callbackData.first_name,\n      user_id: userData.id  \n    }\n  }];\n}\n\nreturn [{\n  json: {\n    playlist_id: null,\n    file_id: null,\n    need_find_file: false,\n    error: true,\n    chat_id: callbackData.chat_id,\n    message_id: callbackData.message_id,\n    user_id: userData.id\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        368
+      ],
+      "id": "8f995317-2ca1-477e-907c-94161729c05f",
+      "name": "Parse Callback"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Parse get_file callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse get_file callback": {
+      "main": [
+        [
+          {
+            "node": "Check user in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check user in DB": {
+      "main": [
+        [
+          {
+            "node": "User banned?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User banned?": {
+      "main": [
+        [
+          {
+            "node": "Send banned message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Admin mode active?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Admin mode active?": {
+      "main": [
+        [
+          {
+            "node": "Send admin mode message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Parse Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send banned message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about banned user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send admin mode message": {
+      "main": [
+        [
+          {
+            "node": "Notify admin about admin mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get file location": {
+      "main": [
+        [
+          {
+            "node": "Copy file to user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Copy file to user": {
+      "main": [
+        [
+          {
+            "node": "Notify admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Callback": {
+      "main": [
+        [
+          {
+            "node": "Get file location",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ebed8fcd-6500-4c34-a8bd-62dec62a70e1",
+  "meta": {
+    "instanceId": "148b2b278c24b3c49bc4399db7e7ce15ed94f5b1044d28401c56f6ab511f0347"
+  },
+  "id": "RoS13WF8DiIbpOjH",
+  "tags": []
+}

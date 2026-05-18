@@ -1,0 +1,254 @@
+{
+  "name": "Handler: user_blocked /r",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1040,
+        80
+      ],
+      "id": "3ce77f82-10d8-4d9b-ba7a-c325d49e9551",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body;\nconst myChatMember = body.my_chat_member;\nconst chat = myChatMember.chat;\nconst from = myChatMember.from;\nconst oldStatus = myChatMember.old_chat_member?.status;\nconst newStatus = myChatMember.new_chat_member?.status;\nconst chatId = chat.id;\nconst username = chat.username || null;\nconst firstName = chat.first_name || '';\nconst lastName = chat.last_name || '';\nconst isPremium = from?.is_premium || false;\nconst languageCode = from?.language_code || 'en';\n\nconst isBlocked = (oldStatus !== 'kicked' && newStatus === 'kicked');\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    username: username,\n    first_name: firstName,\n    last_name: lastName,\n    is_premium: isPremium,\n    language_code: languageCode,\n    old_status: oldStatus,\n    new_status: newStatus,\n    is_blocked: isBlocked\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -816,
+        80
+      ],
+      "id": "6baf5996-7e1e-4d4d-8ee8-4e7023073ebc",
+      "name": "Parse my_chat_member event"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "pocketsound_users",
+          "mode": "list"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "tg_id",
+              "value": "={{ $json.chat_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -592,
+        80
+      ],
+      "id": "69b14e3c-60d0-4954-a3e6-56233ee79e92",
+      "name": "Check user in DB",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "is-blocked",
+              "leftValue": "={{ $json.is_blocked }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -368,
+        80
+      ],
+      "id": "b86ecf57-f342-4cf1-98bb-e91066195fce",
+      "name": "If user blocked bot"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE pocketsound_users SET is_bot_kicked = TRUE, updated_at = CURRENT_TIMESTAMP WHERE tg_id = {{ $json.chat_id }};",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -112,
+        0
+      ],
+      "id": "9d5f7cf8-4173-4390-8afb-81fedb99d5b3",
+      "name": "Update is_bot_kicked",
+      "credentials": {
+        "postgres": {
+          "id": "WIHxOzYOOSEjd0yr",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "-YOUR_ADMIN_CHAT_ID"
+            },
+            {
+              "name": "text",
+              "value": "=User BLOCKED BOT 🔴 🔴 🔴 🔴 🔴 🔴\n\nid: {{ $('Check user in DB').first().json.id }}\ntg_id: {{ $('Check user in DB').first().json.tg_id }}\ntg_username: {{ $('Check user in DB').first().json.tg_username }}\ntg_first_name: {{ $('Check user in DB').first().json.tg_first_name }}\ntg_last_name: {{ $('Check user in DB').first().json.tg_last_name }}\npremium: {{ $('Check user in DB').first().json.premium }}\nlanguage_code: {{ $('Check user in DB').first().json.language_code }}\nis_banned: {{ $('Check user in DB').first().json.is_banned }}\ncreated_at: {{ $('Check user in DB').first().json.created_at }}\nupdated_at: {{ $('Check user in DB').first().json.updated_at }}\nsupport_topic_id: {{ $('Check user in DB').first().json.support_topic_id }}\nBot Status: Kicked is_bot_kicked: {{ $('Check user in DB').first().json.is_bot_kicked }}\n\n🔴 🔴 🔴 🔴 🔴"
+            },
+            {
+              "name": "message_thread_id",
+              "value": "={{ $('Check user in DB').first().json.support_topic_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        112,
+        0
+      ],
+      "id": "ce88902d-1707-41c2-9195-00692c565e1c",
+      "name": "Notify admin in support topic"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        320,
+        80
+      ],
+      "id": "1462551a-678e-4f8a-a465-5b9610acdc3c",
+      "name": "Done"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Parse my_chat_member event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse my_chat_member event": {
+      "main": [
+        [
+          {
+            "node": "Check user in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check user in DB": {
+      "main": [
+        [
+          {
+            "node": "If user blocked bot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If user blocked bot": {
+      "main": [
+        [
+          {
+            "node": "Update is_bot_kicked",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update is_bot_kicked": {
+      "main": [
+        [
+          {
+            "node": "Notify admin in support topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify admin in support topic": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "f7b5a2b2-5cd0-4a4a-8101-308162bf7111",
+  "meta": {
+    "instanceId": "148b2b278c24b3c49bc4399db7e7ce15ed94f5b1044d28401c56f6ab511f0347"
+  },
+  "id": "9qLHcTg15Pydgny1",
+  "tags": []
+}
