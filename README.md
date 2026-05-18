@@ -188,19 +188,6 @@ Activate only the **Webhook Receiver** workflow. All other workflows remain inac
 
 ---
 
-## Environment Variables
-
-Copy `.env.example` to `.env` and fill in your values. See the file for the full list of required variables.
-
----
-
 ## Planned — V3
 
 V3 addresses security, duplication, and complexity issues found in V2. See [ARCHITECTURE.md — Planned Architecture V3](./ARCHITECTURE.md#planned-architecture--v3) for the full plan.
-
-Key changes:
-- `Guard: check_user` sub-workflow — removes ~100 duplicated ban-check nodes across 20 workflows
-- Bot token and admin chat ID moved to n8n credentials/env variables — currently hardcoded in all 23 workflows
-- `Handler: /edit` split into 3 focused workflows (List / Rename / Delete)
-- `Helper: register_user` extracted from `/start` to eliminate duplicated registration logic
-- Parameterized SQL queries throughout
