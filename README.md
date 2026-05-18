@@ -135,7 +135,7 @@ Core tables:
 
 - n8n instance (self-hosted, publicly accessible via HTTPS)
 - PostgreSQL 14+
-- Server with `yt-dlp` installed (for Deezer Pro downloads)
+- Server with `yt-dlp` installed (for Deezer, YT downloads)
 - Telegram Bot Token from [@BotFather](https://t.me/BotFather)
 - A Telegram supergroup for admin/support with Topics enabled
 
